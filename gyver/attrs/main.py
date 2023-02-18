@@ -4,7 +4,8 @@ import typing_extensions
 import linecache
 
 from gyver.attrs.field import Field, FieldInfo, info
-from gyver.attrs.utils.functions import disassemble_type, frozen as freeze
+from gyver.attrs.resolver import FieldsBuilder
+from gyver.attrs.utils.functions import frozen as freeze
 from gyver.attrs.utils.typedef import MISSING, Descriptor, InitOptions
 
 T = typing.TypeVar("T")
@@ -19,6 +20,8 @@ def define(
     *,
     frozen: bool = True,
     slots: bool = True,
+    repr: bool = True,
+    extra_descriptors: typing.Sequence[type[Descriptor]] = (),
 ) -> Callable[[type[T]], type[T]]:
     ...
 
@@ -30,6 +33,8 @@ def define(
     *,
     frozen: bool = True,
     slots: bool = True,
+    repr: bool = True,
+    extra_descriptors: typing.Sequence[type[Descriptor]] = (),
 ) -> type[T]:
     ...
 
@@ -38,7 +43,7 @@ def define(
     order_default=True,
     frozen_default=True,
     kw_only_default=False,
-    field_specifiers=((FieldInfo, info)),
+    field_specifiers=(FieldInfo, info),
 )
 def define(
     maybe_cls: typing.Optional[type[T]] = None,
@@ -47,10 +52,12 @@ def define(
     frozen: bool = True,
     kw_only: bool = False,
     slots: bool = True,
+    repr: bool = True,
+    eq: bool = True,
     extra_descriptors: typing.Sequence[type[Descriptor]] = (),
 ) -> typing.Union[Callable[[type[T]], type[T]], type[T]]:
     def wrap(cls: type[T]) -> type[T]:
-        fields = _map_fields(cls, kw_only)
+        fields = FieldsBuilder(cls, kw_only).from_annotations().build()
         field_map = {field.name: field for field in fields}
         clsdict = (
             _get_clsdict(cls, field_map)
@@ -59,68 +66,15 @@ def define(
         )
         if slots:
             clsdict |= _get_slots_metadata(cls, field_map, extra_descriptors)
-
+        if repr:
+            clsdict |= _get_repr(cls, field_map)
+        if eq:
+            clsdict |= _get_eq(cls, field_map)
         maybe_freeze = freeze if frozen else lambda a: a
 
         return maybe_freeze(type(cls)(cls.__name__, cls.__bases__, clsdict))
 
     return wrap(maybe_cls) if maybe_cls is not None else wrap
-
-
-def _map_fields(cls: type, kw_only: bool) -> Fields:
-    fields: list[Field] = []
-    for key, annotation in cls.__annotations__.items():
-        info = getattr(cls, key, MISSING)
-        default = info
-        alias = ""
-        if isinstance(info, FieldInfo):
-            default = info.default
-            alias = info.alias
-            kw_only = kw_only or info.kw_only
-        fields.append(
-            Field(
-                key,
-                disassemble_type(annotation),
-                kw_only,
-                default,
-                alias or key,
-            )
-        )
-    field_names = {item.name for item in fields}
-    parent_fields: list[Field] = []
-    for parent in reversed(cls.mro()[1:-1]):
-        parent_fields.extend(
-            field
-            for field in getattr(parent, "__gyver_attrs__", {}).values()
-            if field not in field_names
-        )
-
-    seen = set()
-    parent_result = []
-    # will use the leftmost child
-    # when getting inherited definitions
-    for field in reversed(parent_fields):
-        if field.name in seen:
-            continue
-        parent_result.insert(0, field)
-        seen.add(field.name)
-
-    fields = parent_result + fields
-    had_default = False
-    last_default_field = ""
-    for field in fields:
-        if field.kw_only:
-            continue
-        if had_default and field.default is MISSING:
-            raise ValueError(
-                f"Non default field {field.name!r} after field with default"
-                f" {last_default_field!r} without kw_only flag"
-            )
-        if not had_default and field.default is not MISSING:
-            last_default_field = field.name
-            had_default = True
-
-    return tuple(fields)
 
 
 def _get_clsdict(cls: type, field_map: dict[str, Field]):
@@ -180,7 +134,7 @@ def _make_setattr(slots: bool):
 def _get_init(cls: type, field_map: dict[str, Field], opts: InitOptions):
     script_lines = []
     _setattr = _make_setattr(opts["slots"])
-    if not opts["frozen"]:
+    if not opts["slots"]:
         script_lines.append("_inst_dict = self.__dict__")
     args = []
     kw_only_args = []
@@ -235,6 +189,46 @@ def _get_init(cls: type, field_map: dict[str, Field], opts: InitOptions):
     )
     init.__annotations__ = annotations
     return {"__init__": init}
+
+
+def _get_repr(cls: type, field_map: dict[str, Field]):
+    fieldstr = ", ".join(
+        f"{field.name}={{self.{field.name}!r}}" for field in field_map.values()
+    )
+    returnline = f"return f'{cls.__name__}({fieldstr})'"
+    repr_script = f"def __repr__(self):\n    {returnline}"
+    globs = {}
+    repr_func = _make_method(
+        "__repr__",
+        repr_script,
+        _generate_unique_filename(cls, "__repr__"),
+        globs,
+    )
+    repr_func.__annotations__ = {"return": str}
+    return {"__repr__": repr_func}
+
+
+def _get_eq(cls: type, field_map: dict[str, Field]):
+    fields_to_compare = {
+        name: field for name, field in field_map.items() if field.eq
+    }
+    fieldstr = (
+        "("
+        + ", ".join(f"{{target}}.{name}" for name in fields_to_compare)
+        + ")"
+    )
+    othername = "other"
+    returnline = (
+        f"return {fieldstr.format(target='self')} "
+        f"== {fieldstr.format(target=othername)}"
+    )
+    eq_script = f"def __eq__(self, {othername}):\n    {returnline}"
+    annotations = {"return": bool, "othername": cls}
+    eq_func = _make_method(
+        "__eq__", eq_script, _generate_unique_filename(cls, "__eq__"), {}
+    )
+    eq_func.__annotations__ = annotations
+    return {"__eq__": eq_func}
 
 
 def _make_method(
