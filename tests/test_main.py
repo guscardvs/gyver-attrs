@@ -168,7 +168,7 @@ def test_attrs_allow_addition_of_descriptors_on_slotted_classes():
             object.__setattr__(instance, self.private_name, value + 1)
             return result, value
 
-    @define(extra_descriptors=(AccessCounter,))
+    @define
     class MyCls:
         @AccessCounter
         def a(self):

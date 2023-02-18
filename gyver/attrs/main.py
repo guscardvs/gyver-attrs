@@ -21,7 +21,6 @@ def define(
     frozen: bool = True,
     slots: bool = True,
     repr: bool = True,
-    extra_descriptors: typing.Sequence[type[Descriptor]] = (),
 ) -> Callable[[type[T]], type[T]]:
     ...
 
@@ -34,7 +33,6 @@ def define(
     frozen: bool = True,
     slots: bool = True,
     repr: bool = True,
-    extra_descriptors: typing.Sequence[type[Descriptor]] = (),
 ) -> type[T]:
     ...
 
@@ -54,7 +52,6 @@ def define(
     slots: bool = True,
     repr: bool = True,
     eq: bool = True,
-    extra_descriptors: typing.Sequence[type[Descriptor]] = (),
 ) -> typing.Union[Callable[[type[T]], type[T]], type[T]]:
     def wrap(cls: type[T]) -> type[T]:
         fields = FieldsBuilder(cls, kw_only).from_annotations().build()
@@ -65,7 +62,7 @@ def define(
             | _get_init(cls, field_map, {"frozen": frozen, "slots": slots})
         )
         if slots:
-            clsdict |= _get_slots_metadata(cls, field_map, extra_descriptors)
+            clsdict |= _get_slots_metadata(cls, field_map)
         if repr:
             clsdict |= _get_repr(cls, field_map)
         if eq:
@@ -88,7 +85,6 @@ def _get_clsdict(cls: type, field_map: dict[str, Field]):
 def _get_slots_metadata(
     cls: type,
     field_map: dict[str, Field],
-    extra_descriptors: typing.Sequence[Descriptor],
 ) -> typing.Mapping[str, typing.Any]:
     inherited_slots = {}
     for base_cls in cls.mro()[1:-1]:
@@ -105,7 +101,7 @@ def _get_slots_metadata(
         field for field in field_map if field not in reused_slots
     )
     for value in cls.__dict__.values():
-        if _is_descriptor_type(value) and type(value) in extra_descriptors:
+        if _is_descriptor_type(value):
             slot_names += (value.private_name,)
     return inherited_slots | reused_slots | {"__slots__": tuple(slot_names)}
 
@@ -113,7 +109,7 @@ def _get_slots_metadata(
 def _is_descriptor_type(
     obj: typing.Any,
 ) -> typing_extensions.TypeGuard[Descriptor]:
-    return hasattr(obj, "private_name")
+    return hasattr(obj, "private_name") and hasattr(obj, "__get__")
 
 
 def _get_cls_metadata(cls: type):
