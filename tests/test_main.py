@@ -149,3 +149,34 @@ def test_info_allows_opt_out_of_equality():
 
     assert A(1, 2, 3) == A(1, 2, 4)
     assert A(1, 2, 3) != A(1, 3, 3) != A(2, 2, 3)
+
+
+def test_attrs_allow_addition_of_descriptors_on_slotted_classes():
+    class AccessCounter:
+        def __init__(self, func) -> None:
+            self.func = func
+
+        def __set_name__(self, owner: type, name: str):
+            self.public_name = name
+            self.private_name = f"_access_counter_{name}"
+
+        def __get__(self, instance, owner):
+            if not instance:
+                return self
+            value = getattr(instance, self.private_name, 0)
+            result = self.func(instance)
+            object.__setattr__(instance, self.private_name, value + 1)
+            return result, value
+
+    @define(extra_descriptors=(AccessCounter,))
+    class MyCls:
+        @AccessCounter
+        def a(self):
+            return "Hello"
+
+    instance = MyCls()
+
+    assert MyCls.a.private_name in MyCls.__slots__
+    assert instance.a == ("Hello", 0)
+    assert instance.a == ("Hello", 1)
+    assert instance.a == ("Hello", 2)

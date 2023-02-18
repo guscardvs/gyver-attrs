@@ -60,6 +60,8 @@ class FieldsBuilder:
         return self
 
     def from_annotations(self):
+        if not hasattr(self.cls, "__annotations__"):
+            return self
         for key, val in self.cls.__annotations__.items():
             self.add_field(key, val)
         return self
