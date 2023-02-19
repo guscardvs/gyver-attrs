@@ -1,7 +1,9 @@
 from typing import Any, Optional, Sequence
+
 from typing_extensions import Self
-from gyver.attrs.utils.typedef import MISSING, DisassembledType
+
 from gyver.attrs.utils.factory import is_factory_marked
+from gyver.attrs.utils.typedef import MISSING, DisassembledType
 
 
 class Field:
@@ -51,9 +53,7 @@ class Field:
 
     @property
     def has_default(self) -> bool:
-        return self.default is not MISSING and not is_factory_marked(
-            self.default
-        )
+        return self.default is not MISSING and not is_factory_marked(self.default)
 
     @property
     def has_default_factory(self) -> bool:

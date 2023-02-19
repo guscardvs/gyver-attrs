@@ -1,5 +1,6 @@
-from gyver.attrs import define, info, mark_factory
 import pytest
+
+from gyver.attrs import define, info, mark_factory
 
 
 @define
@@ -180,3 +181,31 @@ def test_attrs_allow_addition_of_descriptors_on_slotted_classes():
     assert instance.a == ("Hello", 0)
     assert instance.a == ("Hello", 1)
     assert instance.a == ("Hello", 2)
+
+
+def test_alias_support_works_correctly():
+    @define
+    class A:
+        x: int = info(alias="xVal")
+
+    a = A(xVal=2)
+
+    assert a.x == 2
+
+
+def test_post_and_pre_init_work_correctly():
+    val = 0
+
+    @define
+    class A:
+        def __pre_init__(self):
+            nonlocal val
+            val += 1
+
+        def __post_init__(self):
+            nonlocal val
+            val += 1
+
+    A()
+
+    assert val == 2

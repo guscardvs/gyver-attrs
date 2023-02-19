@@ -1,4 +1,5 @@
 from typing import Any, TypeVar, get_args, get_origin
+
 from .typedef import DisassembledType
 
 T = TypeVar("T")
