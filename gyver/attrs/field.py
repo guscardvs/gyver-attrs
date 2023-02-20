@@ -36,6 +36,10 @@ class Field:
         self.inherited = inherited
 
     @property
+    def argname(self):
+        return self.alias or self.name
+
+    @property
     def has_alias(self) -> bool:
         return self.alias != self.name
 
@@ -53,7 +57,9 @@ class Field:
 
     @property
     def has_default(self) -> bool:
-        return self.default is not MISSING and not is_factory_marked(self.default)
+        return self.default is not MISSING and not is_factory_marked(
+            self.default
+        )
 
     @property
     def has_default_factory(self) -> bool:

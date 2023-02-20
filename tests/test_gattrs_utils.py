@@ -57,20 +57,20 @@ def test_unwrap_deeply_nested_mapping():
     """
 
     @define
-    class A:
-        a: "B"
-
-    @define
-    class B:
-        b: "C"
+    class D:
+        d: str
 
     @define
     class C:
-        c: "tuple[D, ...]"
+        c: tuple[D, ...]
 
     @define
-    class D:
-        d: str
+    class B:
+        b: C
+
+    @define
+    class A:
+        a: B
 
     mapping = {"a": {"b": {"c": ({"d": "value"}, {"d": "another"})}}}
 

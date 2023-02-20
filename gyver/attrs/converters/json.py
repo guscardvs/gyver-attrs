@@ -1,7 +1,6 @@
-from typing import Mapping, cast
-from typing import Any
+from typing import Any, Mapping
 
-from .utils import make_mapping, unwrap_mapping
+from .utils import T, asdict, fromdict
 
 
 try:
@@ -10,7 +9,7 @@ try:
     json_loads = orjson.loads
 
     def json_dumps(v: Any, *, default=None):
-        return orjson.dumps(v, default == default).decode()
+        return orjson.dumps(v, default=default).decode()
 
 except ImportError:
     import json
@@ -28,6 +27,13 @@ def asjson(
 ) -> str:
     if not hasattr(obj, "__gyver_attrs__"):
         raise TypeError("Unable to parse classes not defined with `define`")
-    mapping = unwrap_mapping(
-        cast(Mapping[str, Any], getattr(obj, "__mapping__", make_mapping(obj)))
-    )
+
+    return json_dumps(asdict(obj, by_alias=by_alias))
+
+
+def fromjson(
+    into: type[T],
+    json_str: str,
+) -> T:
+    val = json_loads(json_str)
+    return fromdict(into, val)
