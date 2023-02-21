@@ -1,10 +1,12 @@
-from enum import Enum
 import linecache
 import sys
+from enum import Enum
 from types import EllipsisType
-from typing import Mapping, Union
+from typing import Any, Mapping, Optional, Union
+
 from typing_extensions import Self
-from typing import Any, Optional
+
+from gyver.attrs.utils.functions import implements
 
 
 class MethodType(str, Enum):
@@ -37,9 +39,7 @@ class MethodBuilder:
         self.globs |= globs
         return self
 
-    def add_annotation(
-        self, name: str, value: Union[type, None, EllipsisType]
-    ) -> Self:
+    def add_annotation(self, name: str, value: Union[type, None, EllipsisType]) -> Self:
         self.annotations[name] = value
         return self
 
@@ -55,21 +55,28 @@ class MethodBuilder:
         self.meth_type = meth_type
         return self
 
+    def prepare_method_name(self, cls: type):
+        method_name = self.method_name
+        if implements(cls, method_name):
+            method_name = "_".join(("__gattrs", method_name.lstrip("_")))
+        return method_name
+
     def build(self, cls: type) -> dict[str, Any]:
-        method_annotations, method_script = self._make_methodstr()
+        method_name = self.prepare_method_name(cls)
+        method_annotations, method_script = self._make_methodstr(method_name)
         if cls.__module__ in sys.modules:
             self.merge_globs(sys.modules[cls.__module__].__dict__)
         func = _make_method(
-            self.method_name,
+            method_name,
             method_script,
-            _generate_unique_filename(cls, self.method_name),
+            _generate_unique_filename(cls, method_name),
             self.globs,
         )
         func.__annotations__ = method_annotations
-        return {self.method_name: func}
+        return {method_name: func}
 
-    def _make_methodstr(self):
-        method_header = f"def {self.method_name}("
+    def _make_methodstr(self, method_name: str):
+        method_header = f"def {method_name}("
         method_footer = "):"
         method_decorator = ""
 
@@ -85,9 +92,7 @@ class MethodBuilder:
             args += f'{", " if args else ""}*, {", ".join(self.funckarg)}'
         method_signature = method_header + args + method_footer
 
-        method_body = (
-            "\n    ".join(self.script_lines) if self.script_lines else "pass"
-        )
+        method_body = "\n    ".join(self.script_lines) if self.script_lines else "pass"
         if method_decorator:
             method_signature = method_decorator + method_signature
 

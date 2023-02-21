@@ -1,9 +1,10 @@
 from typing import Any, Mapping, TypeVar, cast
+
 from gyver.attrs.field import Field
 
 T = TypeVar("T")
 try:
-    from gattrs_converter import make_mapping, deserialize_mapping, deserialize
+    from gattrs_converter import deserialize, deserialize_mapping, make_mapping
 
     raise ImportError
 except ImportError:
@@ -20,9 +21,7 @@ except ImportError:
     def deserialize_mapping(
         mapping: Mapping[str, Any], by_alias: bool = True
     ) -> Mapping[str, Any]:
-        return {
-            key: deserialize(value, by_alias) for key, value in mapping.items()
-        }
+        return {key: deserialize(value, by_alias) for key, value in mapping.items()}
 
     def deserialize(value: Any, by_alias: bool = True):
         if hasattr(value, "__gyver_attrs__"):
@@ -30,16 +29,12 @@ except ImportError:
         elif isinstance(value, dict):
             return deserialize_mapping(value, by_alias)
         elif isinstance(value, (list, tuple, set)):
-            return type(value)(
-                map(lambda item: deserialize(item, by_alias), value)
-            )
+            return type(value)(map(lambda item: deserialize(item, by_alias), value))
         return value
 
 
 def asdict(obj: Any, by_alias: bool = False):
-    return deserialize_mapping(
-        make_mapping(obj, by_alias=by_alias), by_alias=by_alias
-    )
+    return deserialize_mapping(make_mapping(obj, by_alias=by_alias), by_alias=by_alias)
 
 
 def fromdict(into: type[T], mapping: Mapping[str, Any]) -> T:

@@ -1,5 +1,6 @@
 import typing
 from unittest.mock import Mock
+
 import pytest
 
 from gyver.attrs import define, info, mark_factory
@@ -323,3 +324,75 @@ def test_define_does_not_create_hashable_when_it_shouldnt():
     assert not issubclass(
         define(C), typing.Hashable
     ), "should not complain if class does not want explicitly hash"
+
+
+def test_define_does_not_overwrite_methods_but_creates_gattrs_alternatives():
+    @define
+    class A:
+        z: int = False
+
+    @define
+    class B:
+        a: int
+        b: int
+
+        def __init__(self, a: int, b: int):
+            self.__gattrs_init__(a, b)
+
+        def __repr__(self):
+            return f"B(a={self.a}, b={self.b})"
+
+        def __eq__(self, other):
+            if other.__class__ is self.__class__:
+                return (self.a, self.b) == (other.a, other.b)
+            else:
+                return NotImplemented
+
+        def __ne__(self, other):
+            result = self.__eq__(other)
+
+            return NotImplemented if result is NotImplemented else not result
+
+        def __lt__(self, other):
+            if other.__class__ is self.__class__:
+                return (self.a, self.b) < (other.a, other.b)
+            else:
+                return NotImplemented
+
+        def __le__(self, other):
+            if other.__class__ is self.__class__:
+                return (self.a, self.b) <= (other.a, other.b)
+            else:
+                return NotImplemented
+
+        def __gt__(self, other):
+            if other.__class__ is self.__class__:
+                return (self.a, self.b) > (other.a, other.b)
+            else:
+                return NotImplemented
+
+        def __ge__(self, other):
+            if other.__class__ is self.__class__:
+                return (self.a, self.b) >= (other.a, other.b)
+            else:
+                return NotImplemented
+
+        def __hash__(self):
+            return hash((self.__class__, self.a, self.b))
+
+    methods = [
+        "__init__",
+        "__repr__",
+        "__eq__",
+        "__hash__",
+        "__ne__",
+        "__lt__",
+        "__le__",
+        "__gt__",
+        "__ge__",
+    ]
+
+    for method in methods:
+        gattr_method = "_".join(("__gattrs", method.lstrip("_")))
+        assert hasattr(A, method) and not hasattr(A, gattr_method)
+        assert hasattr(B, gattr_method)

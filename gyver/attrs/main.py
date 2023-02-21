@@ -1,17 +1,15 @@
-from datetime import date, datetime
 import typing
 from collections.abc import Callable
+from datetime import date, datetime
 
 import typing_extensions
 
+from gyver.attrs.converters.utils import deserialize, deserialize_mapping
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
-from gyver.attrs.utils.functions import (
-    frozen as freeze,
-    indent,
-)
-from gyver.attrs.converters.utils import deserialize_mapping, deserialize
+from gyver.attrs.utils.functions import frozen as freeze
+from gyver.attrs.utils.functions import indent
 from gyver.attrs.utils.typedef import MISSING, Descriptor, InitOptions
 
 T = typing.TypeVar("T")
@@ -67,6 +65,25 @@ def define(
     order: bool = True,
     hash: typing.Optional[bool] = None,
 ) -> typing.Union[Callable[[type[T]], type[T]], type[T]]:
+    """
+    Decorator function that adds functionality to a data class.
+
+    :param maybe_cls: Optional[type[T]], a type argument that needs to be
+    wrapped in the FieldsBuilder.
+    :param frozen: bool, whether to create an immutable class or not.
+    :param kw_only: bool, whether to include keyword-only parameters in the
+    constructor or not.
+    :param slots: bool, whether to generate a class using __slots__ or not.
+    :param repr: bool, whether to generate a __repr__ method or not.
+    :param eq: bool, whether to generate an __eq__ method or not.
+    :param order: bool, whether to generate rich comparison methods or not.
+    :param hash: Optional[bool], whether to generate a __hash__ method or not.
+
+    :return: A callable object that wraps the maybe_cls type argument in a
+    class that implements the specified features.
+    :rtype: typing.Union[Callable[[type[T]], type[T]], type[T]]
+    """
+
     def wrap(cls: type[T]) -> type[T]:
         fields = FieldsBuilder(cls, kw_only).from_annotations().build()
         field_map = {field.name: field for field in fields}
@@ -110,17 +127,14 @@ def _get_slots_metadata(
     inherited_slots = {}
     for base_cls in cls.mro()[1:-1]:
         inherited_slots |= {
-            name: getattr(base_cls, name)
-            for name in getattr(base_cls, "__slots__", ())
+            name: getattr(base_cls, name) for name in getattr(base_cls, "__slots__", ())
         }
     reused_slots = {
         slot: descriptor
         for slot, descriptor in inherited_slots.items()
         if slot in field_map
     }
-    slot_names = tuple(
-        field for field in field_map if field not in reused_slots
-    )
+    slot_names = tuple(field for field in field_map if field not in reused_slots)
     for value in cls.__dict__.values():
         if _is_descriptor_type(value):
             slot_names += (value.private_name,)
@@ -140,9 +154,7 @@ def _get_cls_metadata(cls: type):
 def _make_setattr(frozen: bool):
     def _setattr(field: str, arg: typing.Any):
         return (
-            f"_setattr(self, '{field}', {arg})"
-            if frozen
-            else f"self.{field} = {arg}"
+            f"_setattr(self, '{field}', {arg})" if frozen else f"self.{field} = {arg}"
         )
 
     return _setattr
@@ -214,9 +226,7 @@ _othername = "other"
 
 def _get_eq(cls: type, field_map: FieldMap):
     fields_to_compare = {
-        name: field
-        for name, field in field_map.items()
-        if field.eq is not False
+        name: field for name, field in field_map.items() if field.eq is not False
     }
     builder = MethodBuilder("__eq__").add_funcarg(_othername)
     if fields_to_compare:
@@ -275,8 +285,7 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
         field_type = field.origin or field.declared_type
         if isinstance(field_type, str):
             raise NotImplementedError(
-                "For now gyver-attrs cannot deal correctly"
-                " with forward references"
+                "For now gyver-attrs cannot deal correctly" " with forward references"
             )
         builder.add_glob(f"field_type_{field.name}", field_type)
         if hasattr(field_type, "__parse_dict__"):
@@ -369,10 +378,7 @@ def _get_gserialize(cls: type, field_map: FieldMap):
             arg, globs = _get_gserialize_sequence_arg(field)
             builder.merge_globs(globs)
         else:
-            arg = (
-                f"(dict_get(mapping, '{field.alias}')"
-                f" or mapping['{field.name}'])"
-            )
+            arg = f"(dict_get(mapping, '{field.alias}')" f" or mapping['{field.name}'])"
         args.append(f"{field.alias}={arg}")
     builder.add_scriptline(f"return cls({', '.join(args)})")
     return builder.build(cls)
@@ -507,9 +513,7 @@ def _get_hash(cls: type, fields_map: FieldMap, wants_hash: bool):
             glob = f"_hash_{field.name}"
             arg = f"{glob}({arg})"
             builder.add_glob(glob, field.eq)
-        elif not issubclass(
-            field.origin or field.declared_type, typing.Hashable
-        ):
+        elif not issubclass(field.origin or field.declared_type, typing.Hashable):
             if not wants_hash:
                 return {}
             raise TypeError("field type is not hashable", field.name, cls)

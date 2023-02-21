@@ -33,3 +33,17 @@ def indent(string: str, *, skip_line: bool) -> str:
     if skip_line:
         returnstr = "\n" + returnstr
     return returnstr
+
+
+_sentinel = object()
+
+
+def implements(cls: type, name: str):
+    attr = getattr(cls, name, _sentinel)
+    if attr is _sentinel:
+        return False
+
+    return next(
+        (False for base_cls in cls.mro()[1:] if getattr(base_cls, name, None) is attr),
+        True,
+    )

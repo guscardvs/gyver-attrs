@@ -1,7 +1,6 @@
-from typing import Any, Mapping
+from typing import Any
 
 from .utils import T, asdict, fromdict
-
 
 try:
     import orjson

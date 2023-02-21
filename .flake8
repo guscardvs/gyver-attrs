@@ -1,3 +1,4 @@
 [flake8]
 exclude =
     *.pyi
+max-line-length= 88
