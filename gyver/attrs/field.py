@@ -1,4 +1,5 @@
-from typing import Any, Optional, Sequence
+from typing import Union
+from typing import Any, Callable, Optional, Sequence
 
 from typing_extensions import Self
 
@@ -13,8 +14,9 @@ class Field:
         "kw_only",
         "default",
         "alias",
-        "inherited",
         "eq",
+        "order",
+        "inherited",
     )
 
     def __init__(
@@ -24,7 +26,8 @@ class Field:
         kw_only: bool,
         default: Any,
         alias: str,
-        eq: bool,
+        eq: Union[bool, Callable[[Any], Any]],
+        order: Union[bool, Callable[[Any], Any]],
         inherited: bool = False,
     ) -> None:
         self.name = name
@@ -33,6 +36,7 @@ class Field:
         self.default = default
         self.alias = alias
         self.eq = eq
+        self.order = order
         self.inherited = inherited
 
     @property
@@ -86,32 +90,41 @@ class Field:
             + ")"
         )
 
+    def asdict(self):
+        return {key: getattr(self, key) for key in self.__slots__}
+
+    def duplicate(self, **overload):
+        return type(self)(**self.asdict() | overload)
+
     def inherit(self) -> Self:
-        return Field(
-            self.name,
-            self.type_,
-            self.kw_only,
-            self.default,
-            self.alias,
-            self.eq,
-            inherited=True,
-        )
+        return self.duplicate(inherited=True)
 
 
 class FieldInfo:
-    __slots__ = ("default", "kw_only", "alias", "eq")
+    __slots__ = ("default", "kw_only", "alias", "eq", "order")
 
     def __init__(
         self,
         default: Any,
         alias: str,
         kw_only: bool,
-        eq: bool,
+        eq: Union[bool, Callable[[Any], Any]],
+        order: Union[bool, Callable[[Any], Any]],
     ) -> None:
         self.default = default
         self.kw_only = kw_only
         self.alias = alias
         self.eq = eq
+        self.order = order
+
+    def asdict(self):
+        return {key: getattr(self, key) for key in self.__slots__}
+
+    def duplicate(self, **overload):
+        return FieldInfo(**self.asdict() | overload)
+
+    def build(self, **extras) -> Field:
+        return Field(**self.asdict() | extras)
 
 
 def info(
@@ -119,11 +132,16 @@ def info(
     default: Any = ...,
     alias: str = "",
     kw_only: bool = False,
-    eq: bool = True,
-) -> Any:
+    eq: Union[bool, Callable[[Any], Any]] = True,
+    order: Union[bool, Callable[[Any], Any]] = True,
+) -> Any:  # sourcery skip: instance-method-first-arg-name
     return FieldInfo(
         default if default is not Ellipsis else MISSING,
         alias,
         kw_only,
         eq,
+        order,
     )
+
+
+default_info = info()

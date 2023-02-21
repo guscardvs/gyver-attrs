@@ -26,3 +26,10 @@ def frozen(cls: type[T]) -> type[T]:
     setattr(cls, "__setattr__", frozen_setattr)
     setattr(cls, "__delattr__", frozen_delattr)
     return cls
+
+
+def indent(string: str, *, skip_line: bool) -> str:
+    returnstr = f"    {string}"
+    if skip_line:
+        returnstr = "\n" + returnstr
+    return returnstr

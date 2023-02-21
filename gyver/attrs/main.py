@@ -7,13 +7,16 @@ import typing_extensions
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
-from gyver.attrs.utils.functions import frozen as freeze
+from gyver.attrs.utils.functions import (
+    frozen as freeze,
+    indent,
+)
 from gyver.attrs.converters.utils import deserialize_mapping, deserialize
 from gyver.attrs.utils.typedef import MISSING, Descriptor, InitOptions
 
 T = typing.TypeVar("T")
 
-Fields = typing.Sequence[Field]
+FieldMap = dict[str, Field]
 
 
 @typing.overload
@@ -24,6 +27,9 @@ def define(
     frozen: bool = True,
     slots: bool = True,
     repr: bool = True,
+    eq: bool = True,
+    order: bool = True,
+    hash: typing.Optional[bool] = None,
 ) -> Callable[[type[T]], type[T]]:
     ...
 
@@ -36,6 +42,9 @@ def define(
     frozen: bool = True,
     slots: bool = True,
     repr: bool = True,
+    eq: bool = True,
+    order: bool = True,
+    hash: typing.Optional[bool] = None,
 ) -> type[T]:
     ...
 
@@ -55,6 +64,8 @@ def define(
     slots: bool = True,
     repr: bool = True,
     eq: bool = True,
+    order: bool = True,
+    hash: typing.Optional[bool] = None,
 ) -> typing.Union[Callable[[type[T]], type[T]], type[T]]:
     def wrap(cls: type[T]) -> type[T]:
         fields = FieldsBuilder(cls, kw_only).from_annotations().build()
@@ -72,6 +83,11 @@ def define(
             clsdict |= _get_repr(cls, field_map)
         if eq:
             clsdict |= _get_eq(cls, field_map)
+            clsdict |= _get_ne(cls)
+        if order:
+            clsdict |= _get_order(cls, field_map)
+        if hash or (hash is None and frozen):
+            clsdict |= _get_hash(cls, field_map, bool(hash))
         maybe_freeze = freeze if frozen else lambda a: a
         _get_gserialize(cls, field_map)
         return maybe_freeze(type(cls)(cls.__name__, cls.__bases__, clsdict))
@@ -79,7 +95,7 @@ def define(
     return wrap(maybe_cls) if maybe_cls is not None else wrap
 
 
-def _get_clsdict(cls: type, field_map: dict[str, Field]):
+def _get_clsdict(cls: type, field_map: FieldMap):
     return {
         key: value
         for key, value in cls.__dict__.items()
@@ -89,7 +105,7 @@ def _get_clsdict(cls: type, field_map: dict[str, Field]):
 
 def _get_slots_metadata(
     cls: type,
-    field_map: dict[str, Field],
+    field_map: FieldMap,
 ) -> typing.Mapping[str, typing.Any]:
     inherited_slots = {}
     for base_cls in cls.mro()[1:-1]:
@@ -132,7 +148,7 @@ def _make_setattr(frozen: bool):
     return _setattr
 
 
-def _get_init(cls: type, field_map: dict[str, Field], opts: InitOptions):
+def _get_init(cls: type, field_map: FieldMap, opts: InitOptions):
     builder = MethodBuilder(
         "__init__",
         {
@@ -178,7 +194,7 @@ def _get_init(cls: type, field_map: dict[str, Field], opts: InitOptions):
     return builder.build(cls)
 
 
-def _get_repr(cls: type, field_map: dict[str, Field]):
+def _get_repr(cls: type, field_map: FieldMap):
     fieldstr = ", ".join(
         f"{field.name}={{self.{field.name}!r}}" for field in field_map.values()
     )
@@ -193,31 +209,54 @@ def _get_repr(cls: type, field_map: dict[str, Field]):
     )
 
 
-def _get_eq(cls: type, field_map: dict[str, Field]):
+_othername = "other"
+
+
+def _get_eq(cls: type, field_map: FieldMap):
     fields_to_compare = {
-        name: field for name, field in field_map.items() if field.eq
+        name: field
+        for name, field in field_map.items()
+        if field.eq is not False
     }
-    fieldstr = (
-        "("
-        + ", ".join(f"{{target}}.{name}" for name in fields_to_compare)
-        + ")"
-    )
-    othername = "other"
-    returnline = (
-        f"return {fieldstr.format(target='self')} "
-        f"== {fieldstr.format(target=othername)}"
-    )
+    builder = MethodBuilder("__eq__").add_funcarg(_othername)
+    if fields_to_compare:
+        return _build_field_comparison(builder, fields_to_compare, cls)
+    returnline = "return _object_eq(self, other)"
     return (
-        MethodBuilder("__eq__")
-        .add_scriptline(returnline)
-        .add_funcarg(othername)
+        builder.add_glob("_object_eq", object.__eq__)
         .add_annotation("return", bool)
-        .add_annotation("othername", cls)
+        .add_scriptline(returnline)
         .build(cls)
     )
 
 
-def _get_parse_dict(cls: type, field_map: dict[str, Field]):
+def _build_field_comparison(
+    builder: MethodBuilder, fields_to_compare: FieldMap, cls: type
+):
+    builder.add_scriptline("if type(other) is type(self):")
+    args = []
+    for field in fields_to_compare.values():
+        arg = f"{{target}}.{field.name}"
+        if field.eq is not True:
+            glob_name = f"_parser_{field.name}"
+            arg = f"{glob_name}({arg})"
+            builder.add_glob(glob_name, field.eq)
+        args.append(arg)
+
+    fieldstr = "(" + ", ".join(args) + ",)"
+    builder.add_scriptline(
+        indent(
+            f"return {fieldstr.format(target='self')} "
+            f"== {fieldstr.format(target=_othername)}",
+            skip_line=False,
+        )
+    )
+    builder.add_scriptline("else:")
+    builder.add_scriptline(indent("return NotImplemented", skip_line=False))
+    return builder.add_annotation("return", bool).build(cls)
+
+
+def _get_parse_dict(cls: type, field_map: FieldMap):
     args = []
     alias_args = []
     builder = (
@@ -297,7 +336,7 @@ def _get_parse_dict_sequence_arg(field: Field) -> str:
         return f"'{{name}}': deserialize(self.{field.name}, alias)"
 
 
-def _get_gserialize(cls: type, field_map: dict[str, Field]):
+def _get_gserialize(cls: type, field_map: FieldMap):
     args = []
     builder = (
         MethodBuilder(
@@ -381,3 +420,102 @@ def _get_gserialize_sequence_arg(
                 f" for x in {default_line})"
             )
     return returnline, globs
+
+
+def _get_ne(cls: type):
+    return (
+        MethodBuilder("__ne__")
+        .add_funcarg(_othername)
+        .add_annotation("return", bool)
+        .add_scriptline("result = self.__eq__(other)")
+        .add_scriptline("if result is NotImplemented:")
+        .add_scriptline(indent("return NotImplemented", skip_line=False))
+        .add_scriptline("else:")
+        .add_scriptline(indent("return not result", skip_line=False))
+        .build(cls)
+    )
+
+
+def _get_order(cls: type, field_map: FieldMap):
+    payload = {}
+
+    for name, signal in [
+        ("__lt__", "<"),
+        ("__le__", "<="),
+        ("__gt__", ">"),
+        ("__ge__", ">="),
+    ]:
+        payload |= _make_comparator_builder(name, signal, field_map).build(cls)
+    return payload
+
+
+def _get_order_attr_tuple(fields: list[Field]) -> str:
+    args = []
+    for field in fields:
+        arg = f"{{target}}.{field.name}"
+        if field.order is not True:
+            arg = f"_parser_{field.name}({arg})"
+        args.append(arg)
+
+    return f"({', '.join(args)},)"
+
+
+def _make_comparator_builder(name: str, signal: str, field_map: FieldMap):
+    fields = [
+        field
+        for field in field_map.values()
+        if field.order is True or callable(field.order)
+    ]
+    if not fields:
+        return (
+            MethodBuilder(name, {f"_object_{name}": getattr(object, name)})
+            .add_funcarg(_othername)
+            .add_annotation("return", bool)
+            .add_scriptline(f"return _object_{name}(self, other)")
+        )
+    builder = MethodBuilder(
+        name,
+        {f"_parser_{field.name}": field.order for field in field_map.values()},
+    )
+    attr_tuple = _get_order_attr_tuple(fields)
+    return (
+        builder.add_funcarg(_othername)
+        .add_annotation("return", bool)
+        .add_scriptline("if type(other) is type(self):")
+        .add_scriptline(
+            indent(
+                "return "
+                + f" {signal} ".join(
+                    (
+                        attr_tuple.format(target="self"),
+                        attr_tuple.format(target="other"),
+                    )
+                ),
+                skip_line=False,
+            )
+        )
+        .add_scriptline("return NotImplemented")
+    )
+
+
+def _get_hash(cls: type, fields_map: FieldMap, wants_hash: bool):
+    builder = MethodBuilder("__hash__")
+    args = ["type(self)"]
+    for field in fields_map.values():
+        arg = f"self.{field.name}"
+        if not isinstance(field.eq, bool):
+            glob = f"_hash_{field.name}"
+            arg = f"{glob}({arg})"
+            builder.add_glob(glob, field.eq)
+        elif not issubclass(
+            field.origin or field.declared_type, typing.Hashable
+        ):
+            if not wants_hash:
+                return {}
+            raise TypeError("field type is not hashable", field.name, cls)
+        args.append(arg)
+    return (
+        builder.add_scriptline(f"return hash(({', '.join(args)}))")
+        .add_annotation("return", int)
+        .build(cls)
+    )

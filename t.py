@@ -1,10 +1,7 @@
-import cProfile
 from datetime import datetime
-from timeit import timeit
 from gyver.attrs import define
 from gyver.attrs.converters.json import asjson, fromjson
 from gyver.attrs.field import info
-from gyver.attrs.converters.utils import asdict
 
 
 @define
@@ -19,7 +16,13 @@ class A:
     w: datetime
 
 
+@define
+class C(A):
+    pass
+
+
 obj = A(1, (B(2), B(3)), datetime.now())
+other = A(1, (B(2), B(3)), datetime.now())
 target_json = asjson(obj)
 
 
@@ -28,6 +31,10 @@ def make_class():
     fromjson(A, target_json)
 
 
-print(fromjson(A, target_json))
-print(timeit(make_class))
+def with_other(meth):
+    return lambda: meth(other)
+
+
+# print(fromjson(A, target_json))
+# print(timeit(make_class))
 # print(cProfile.runctx("make_class()", globals(), locals()))

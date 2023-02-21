@@ -1,3 +1,5 @@
+import typing
+from unittest.mock import Mock
 import pytest
 
 from gyver.attrs import define, info, mark_factory
@@ -137,8 +139,23 @@ def test_eq_validates_equality_correctly():
 
     a = A(1)
     a2 = A(1)
-
     assert a == a2
+
+
+def test_eq_validates_inequality_correctly():  # sourcery skip: de-morgan
+    @define(frozen=False, slots=False)
+    class A:
+        x: int
+
+    eq_mock = Mock()
+    eq_mock.return_value = True
+
+    a = A(1)
+    a.__eq__ = eq_mock
+    a2 = A(1)
+
+    assert not (a != a2)
+    assert eq_mock.call_count == 1
 
 
 def test_info_allows_opt_out_of_equality():
@@ -209,3 +226,100 @@ def test_post_and_pre_init_work_correctly():
     A()
 
     assert val == 2
+
+
+def test_define_compares_correctly_with_parser():
+    @define
+    class Person:
+        name: str = info(eq=str.lower)
+
+    @define
+    class A:
+        x: int = info(eq=lambda val: val % 3)
+
+    assert Person("John") == Person("john") != Person("jane")
+    assert A(3) == A(6) != A(7)
+
+
+def test_define_creates_ordering_correctly():
+    @define
+    class A:
+        x: int
+        y: int
+        z: int
+
+    @define(order=False)
+    class Unorderable:
+        x: int
+
+    a1 = A(1, 2, 3)
+    a2 = A(2, 3, 4)
+    a3 = A(2, 4, 5)
+
+    items = [a3, a1, a2]
+    expected = [a1, a2, a3]
+
+    for item in sorted(items):
+        assert item is expected.pop(0)
+
+    for item in ["__lt__", "__gt__", "__le__", "__ge__"]:
+        assert hasattr(A, item)
+
+    with pytest.raises(TypeError):
+        Unorderable(1) > Unorderable(2)  # type: ignore
+
+
+def test_define_creates_ordering_only_for_direct_instances():
+    @define
+    class A:
+        x: int
+
+    class B(A):
+        pass
+
+    with pytest.raises(TypeError):
+        A(1) < B(1)  # type: ignore
+
+
+def test_define_creates_hashable_classes():
+    @define
+    class A:
+        x: int
+
+    @define
+    class B:
+        x: int = info(eq=lambda val: val % 3)
+
+    sentinel = object()
+
+    assert isinstance(A(1), typing.Hashable)
+    assert {A(1): sentinel}[A(1)] is sentinel
+    assert hash(A(2)) != hash(A(1)) == hash(A(1))
+    assert hash(B(3)) == hash(B(6)) != hash(B(7))
+    assert A(1) is not A(2)
+
+
+def test_define_does_not_create_hashable_when_it_shouldnt():
+    @define(hash=False)
+    class A:
+        x: int
+
+    @define(frozen=False)
+    class B:
+        x: int
+
+    with pytest.raises(TypeError):
+        hash(A(1))
+    with pytest.raises(TypeError):
+        hash(B(1))
+
+    class C:
+        x: list[int]
+
+    with pytest.raises(TypeError) as exc_info:
+        define(hash=True)(C)
+
+    assert exc_info.value.args == ("field type is not hashable", "x", C)
+    assert not issubclass(
+        define(C), typing.Hashable
+    ), "should not complain if class does not want explicitly hash"

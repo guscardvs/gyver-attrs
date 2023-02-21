@@ -1,6 +1,6 @@
 from typing import Sequence, cast
 
-from .field import Field, FieldInfo
+from .field import Field, FieldInfo, default_info
 from .utils.functions import disassemble_type
 from .utils.typedef import MISSING
 
@@ -39,22 +39,14 @@ class FieldsBuilder:
         self.field_names.update(seen)
 
     def add_field(self, key: str, annotation: type):
-        info = getattr(self.cls, key, MISSING)
-        default = info
-        alias = ""
-        eq = True
-        if isinstance(info, FieldInfo):
-            default = info.default
-            alias = info.alias
-            self.kw_only = self.kw_only or info.kw_only
-            eq = info.eq
-        field = Field(
-            key,
-            disassemble_type(annotation),
-            self.kw_only,
-            default,
-            alias or key,
-            eq,
+        default = getattr(self.cls, key, MISSING)
+        info = default_info.duplicate(default=default)
+        if isinstance(default, FieldInfo):
+            info = default
+        field = info.build(
+            name=key,
+            type_=disassemble_type(annotation),
+            alias=info.alias or key,
         )
         self.fields.append(field)
         self.field_names.add(field.name)
