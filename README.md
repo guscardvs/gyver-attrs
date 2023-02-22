@@ -122,7 +122,6 @@ Contributions are welcome! Here are the steps to get started:
 * Make your desired changes.
 * Ensure that all tests pass with **`make test`**.
 * Format the code with **`make format`**.
-* Run linters with **`make lint`**.
 * Push your changes to your fork and create a pull request.
 
 Thank you for contributing to gyver-attrs!
