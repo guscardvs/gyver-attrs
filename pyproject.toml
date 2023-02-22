@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Gustavo Cardoso <self.gustavocorrea@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "gyver/attrs" }]
+packages = [{ include = "gyver" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
