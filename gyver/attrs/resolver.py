@@ -9,9 +9,9 @@ class FieldsBuilder:
     def __init__(self, cls: type, kw_only: bool):
         self.cls = cls
         self.kw_only = kw_only
-        self.field_names = set()
-        self.parent_fields = []
-        self.fields = []
+        self.field_names: set[str] = set()
+        self.parent_fields: list[Field] = []
+        self.fields: list[Field] = []
 
     def build(self):
         self._add_parent_fields()

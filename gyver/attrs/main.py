@@ -107,7 +107,13 @@ def define(
             clsdict |= _get_hash(cls, field_map, bool(hash))
         maybe_freeze = freeze if frozen else lambda a: a
         _get_gserialize(cls, field_map)
-        return maybe_freeze(type(cls)(cls.__name__, cls.__bases__, clsdict))
+        return maybe_freeze(
+            type(cls)(  # type: ignore
+                cls.__name__,
+                cls.__bases__,
+                clsdict,
+            )
+        )
 
     return wrap(maybe_cls) if maybe_cls is not None else wrap
 
@@ -124,17 +130,20 @@ def _get_slots_metadata(
     cls: type,
     field_map: FieldMap,
 ) -> typing.Mapping[str, typing.Any]:
-    inherited_slots = {}
+    inherited_slots: dict[str, typing.Any] = {}
     for base_cls in cls.mro()[1:-1]:
         inherited_slots |= {
-            name: getattr(base_cls, name) for name in getattr(base_cls, "__slots__", ())
+            name: getattr(base_cls, name)
+            for name in getattr(base_cls, "__slots__", ())
         }
     reused_slots = {
         slot: descriptor
         for slot, descriptor in inherited_slots.items()
         if slot in field_map
     }
-    slot_names = tuple(field for field in field_map if field not in reused_slots)
+    slot_names = tuple(
+        field for field in field_map if field not in reused_slots
+    )
     for value in cls.__dict__.values():
         if _is_descriptor_type(value):
             slot_names += (value.private_name,)
@@ -154,7 +163,9 @@ def _get_cls_metadata(cls: type):
 def _make_setattr(frozen: bool):
     def _setattr(field: str, arg: typing.Any):
         return (
-            f"_setattr(self, '{field}', {arg})" if frozen else f"self.{field} = {arg}"
+            f"_setattr(self, '{field}', {arg})"
+            if frozen
+            else f"self.{field} = {arg}"
         )
 
     return _setattr
@@ -226,7 +237,9 @@ _othername = "other"
 
 def _get_eq(cls: type, field_map: FieldMap):
     fields_to_compare = {
-        name: field for name, field in field_map.items() if field.eq is not False
+        name: field
+        for name, field in field_map.items()
+        if field.eq is not False
     }
     builder = MethodBuilder("__eq__").add_funcarg(_othername)
     if fields_to_compare:
@@ -285,7 +298,8 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
         field_type = field.origin or field.declared_type
         if isinstance(field_type, str):
             raise NotImplementedError(
-                "For now gyver-attrs cannot deal correctly" " with forward references"
+                "For now gyver-attrs cannot deal correctly"
+                " with forward references"
             )
         builder.add_glob(f"field_type_{field.name}", field_type)
         if hasattr(field_type, "__parse_dict__"):
@@ -378,7 +392,10 @@ def _get_gserialize(cls: type, field_map: FieldMap):
             arg, globs = _get_gserialize_sequence_arg(field)
             builder.merge_globs(globs)
         else:
-            arg = f"(dict_get(mapping, '{field.alias}')" f" or mapping['{field.name}'])"
+            arg = (
+                f"(dict_get(mapping, '{field.alias}')"
+                f" or mapping['{field.name}'])"
+            )
         args.append(f"{field.alias}={arg}")
     builder.add_scriptline(f"return cls({', '.join(args)})")
     return builder.build(cls)
@@ -443,7 +460,7 @@ def _get_ne(cls: type):
 
 
 def _get_order(cls: type, field_map: FieldMap):
-    payload = {}
+    payload: dict[str, typing.Any] = {}
 
     for name, signal in [
         ("__lt__", "<"),
@@ -513,7 +530,9 @@ def _get_hash(cls: type, fields_map: FieldMap, wants_hash: bool):
             glob = f"_hash_{field.name}"
             arg = f"{glob}({arg})"
             builder.add_glob(glob, field.eq)
-        elif not issubclass(field.origin or field.declared_type, typing.Hashable):
+        elif not issubclass(
+            field.origin or field.declared_type, typing.Hashable
+        ):
             if not wants_hash:
                 return {}
             raise TypeError("field type is not hashable", field.name, cls)

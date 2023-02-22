@@ -21,10 +21,10 @@ class MethodBuilder:
     ) -> None:
         self.method_name = method_name
         self.globs = globs or {}
-        self.script_lines = []
-        self.annotations = {}
-        self.funcargs = []
-        self.funckarg = []
+        self.script_lines: list[str] = []
+        self.annotations: dict[str, Union[type, None, EllipsisType]] = {}
+        self.funcargs: list[str] = []
+        self.funckargs: list[str] = []
         self.meth_type = MethodType.INSTANCE
 
     def add_scriptline(self, line: str) -> Self:
@@ -39,7 +39,9 @@ class MethodBuilder:
         self.globs |= globs
         return self
 
-    def add_annotation(self, name: str, value: Union[type, None, EllipsisType]) -> Self:
+    def add_annotation(
+        self, name: str, value: Union[type, None, EllipsisType]
+    ) -> Self:
         self.annotations[name] = value
         return self
 
@@ -48,7 +50,7 @@ class MethodBuilder:
         return self
 
     def add_funckarg(self, name: str) -> Self:
-        self.funckarg.append(name)
+        self.funckargs.append(name)
         return self
 
     def set_type(self, meth_type: MethodType) -> Self:
@@ -88,11 +90,13 @@ class MethodBuilder:
         else:
             self.funcargs.insert(0, "self")
         args = ", ".join(self.funcargs)
-        if self.funckarg:
-            args += f'{", " if args else ""}*, {", ".join(self.funckarg)}'
+        if self.funckargs:
+            args += f'{", " if args else ""}*, {", ".join(self.funckargs)}'
         method_signature = method_header + args + method_footer
 
-        method_body = "\n    ".join(self.script_lines) if self.script_lines else "pass"
+        method_body = (
+            "\n    ".join(self.script_lines) if self.script_lines else "pass"
+        )
         if method_decorator:
             method_signature = method_decorator + method_signature
 
@@ -114,7 +118,7 @@ def _make_method(
     """
     Create the method with the script given and return the method object.
     """
-    locs = {}
+    locs: dict[str, Any] = {}
 
     count = 1
     base_filename = filename
