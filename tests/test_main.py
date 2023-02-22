@@ -1,3 +1,4 @@
+import pathlib
 import typing
 from unittest.mock import Mock
 
@@ -396,3 +397,15 @@ def test_define_does_not_overwrite_methods_but_creates_gattrs_alternatives():
         gattr_method = "_".join(("__gattrs", method.lstrip("_")))
         assert hasattr(A, method) and not hasattr(A, gattr_method)
         assert hasattr(B, gattr_method)
+
+
+Validator = typing.Callable[[typing.Any], bool]
+
+
+def test_defines_correctly_classes_with_non_types_as_hints():
+    @define
+    class Whatever:
+        validator: Validator
+        root: pathlib.Path
+        look_on: typing.Optional[pathlib.Path] = None
+        exclude: typing.Sequence[typing.Union[str, pathlib.Path]] = ()
