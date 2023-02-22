@@ -1,3 +1,15 @@
+## 0.1.3 (2023-02-22)
+
+### Fix
+
+- fixed bug where serialization did not handle typealias
+
+## 0.1.2 (2023-02-22)
+
+### Fix
+
+- fixed ellipsis import
+
 ## 0.1.1 (2023-02-22)
 
 ### Fix
