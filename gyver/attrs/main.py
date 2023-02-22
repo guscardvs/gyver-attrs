@@ -296,6 +296,8 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
         builder.add_glob(f"field_type_{field.name}", field_type)
         if hasattr(field_type, "__parse_dict__"):
             arg = f"'{{name}}': self.{name}.__parse_dict__(alias)"
+        elif not isinstance(field_type, type):
+            arg = f"'{{name}}': self.{name}"
         elif issubclass(field_type, (list, tuple, set, dict)):
             arg = _get_parse_dict_sequence_arg(field)
         else:
@@ -316,9 +318,9 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
 
 def _get_parse_dict_sequence_arg(field: Field) -> str:
     field_type = field.origin or field.declared_type
-    if not field.args:
+    if not field.args or not isinstance(field_type, type):
         return f"'{{name}}': self.{field.name}"
-    if (
+    elif (
         len(field.args) > 1
         and issubclass(field_type, tuple)
         and (len(field.args) != 2 or field.args[1] is not Ellipsis)
