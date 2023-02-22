@@ -1,12 +1,13 @@
 import linecache
 import sys
 from enum import Enum
-from types import EllipsisType
 from typing import Any, Mapping, Optional, Union
 
 from typing_extensions import Self
 
 from gyver.attrs.utils.functions import implements
+
+EllipsisType = type(...)
 
 
 class MethodType(str, Enum):
