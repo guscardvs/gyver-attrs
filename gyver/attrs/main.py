@@ -445,7 +445,7 @@ def _get_gserialize_sequence_arg(
         if hasattr(element_type, "__gserialize__"):
             globs[f"_elem_type_{field.name}"] = element_type
             returnline = (
-                f"field_type_{field.name}("
+                f"_field_type_{field.name}("
                 f"_elem_type_{field.name}.__gserialize__(x)"
                 f" for x in {default_line})"
             )
