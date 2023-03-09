@@ -6,12 +6,22 @@ from .utils.typedef import MISSING
 
 
 class FieldsBuilder:
-    def __init__(self, cls: type, kw_only: bool):
+    __slots__ = (
+        "cls",
+        "kw_only",
+        "field_names",
+        "parent_fields",
+        "fields",
+        "field_class",
+    )
+
+    def __init__(self, cls: type, kw_only: bool, field_class: type[Field]):
         self.cls = cls
         self.kw_only = kw_only
         self.field_names: set[str] = set()
         self.parent_fields: list[Field] = []
         self.fields: list[Field] = []
+        self.field_class = field_class
 
     def build(self):
         self._add_parent_fields()
@@ -44,6 +54,7 @@ class FieldsBuilder:
         if isinstance(default, FieldInfo):
             info = default
         field = info.build(
+            self.field_class,
             name=key,
             type_=disassemble_type(annotation),
             alias=info.alias or key,

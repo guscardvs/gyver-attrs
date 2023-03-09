@@ -1,10 +1,15 @@
+import dataclasses
 import typing
 from collections.abc import Callable
 from datetime import date, datetime
 
 import typing_extensions
 
-from gyver.attrs.converters.utils import deserialize, deserialize_mapping
+from gyver.attrs.converters.utils import (
+    deserialize,
+    deserialize_mapping,
+    fromdict,
+)
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
@@ -23,11 +28,15 @@ def define(
     /,
     *,
     frozen: bool = True,
+    kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
+    pydantic: typing.Optional[bool] = None,
+    dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> Callable[[type[T]], type[T]]:
     ...
 
@@ -38,11 +47,15 @@ def define(
     /,
     *,
     frozen: bool = True,
+    kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
+    pydantic: typing.Optional[bool] = None,
+    dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> type[T]:
     ...
 
@@ -64,6 +77,9 @@ def define(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
+    pydantic: typing.Optional[bool] = None,
+    dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> typing.Union[Callable[[type[T]], type[T]], type[T]]:
     """
     Decorator function that adds functionality to a data class.
@@ -78,6 +94,12 @@ def define(
     :param eq: bool, whether to generate an __eq__ method or not.
     :param order: bool, whether to generate rich comparison methods or not.
     :param hash: Optional[bool], whether to generate a __hash__ method or not.
+    :param pydantic: Optional[bool], whether to generate a __get_validator__ method or
+    not to facilitate integration with pydantic.
+    :param dataclass_fields: bool, whether to add __dataclass_fields__ with the
+    dataclass format. This way, the class becomes a drop-in replacement for dataclasses.
+    **Warning**: dataclass_fields with pydantic=False will fail when trying to use with
+    pydantic.
 
     :return: A callable object that wraps the maybe_cls type argument in a
     class that implements the specified features.
@@ -85,7 +107,9 @@ def define(
     """
 
     def wrap(cls: type[T]) -> type[T]:
-        fields = FieldsBuilder(cls, kw_only).from_annotations().build()
+        fields = (
+            FieldsBuilder(cls, kw_only, field_class).from_annotations().build()
+        )
         field_map = {field.name: field for field in fields}
         clsdict = (
             _get_clsdict(cls, field_map)
@@ -105,8 +129,11 @@ def define(
             clsdict |= _get_order(cls, field_map)
         if hash or (hash is None and frozen):
             clsdict |= _get_hash(cls, field_map, bool(hash))
+        if pydantic is not False:
+            clsdict |= _maybe_get_pydantic(cls, field_map, pydantic is True)
+        if dataclass_fields:
+            clsdict |= _make_dataclass_fields(field_map)
         maybe_freeze = freeze if frozen else lambda a: a
-        _get_gserialize(cls, field_map)
         return maybe_freeze(
             type(cls)(  # type: ignore
                 cls.__name__,
@@ -267,19 +294,19 @@ def _build_field_comparison(
         args.append(arg)
 
     fieldstr = "(" + ", ".join(args) + ",)"
-    builder.add_scriptline(
+    builder.add_scriptlines(
         indent(
             f"return {fieldstr.format(target='self')} "
             f"== {fieldstr.format(target=_othername)}",
-            skip_line=False,
-        )
+        ),
+        "else:",
+        indent("return NotImplemented"),
     )
-    builder.add_scriptline("else:")
-    builder.add_scriptline(indent("return NotImplemented", skip_line=False))
     return builder.add_annotation("return", bool).build(cls)
 
 
 def _get_parse_dict(cls: type, field_map: FieldMap):
+    namespace = {}
     args = []
     alias_args = []
     builder = (
@@ -321,7 +348,11 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
             )
         )
     )
-    return builder.build(cls)
+    namespace |= builder.build(cls)
+
+    builder = MethodBuilder("__iter__", {"todict": deserialize})
+    builder.add_scriptline("yield from todict(self).items()")
+    return namespace | builder.build(cls)
 
 
 def _get_parse_dict_sequence_arg(field: Field) -> str:
@@ -361,13 +392,23 @@ def _get_parse_dict_sequence_arg(field: Field) -> str:
         return f"'{{name}}': deserialize(self.{field.name}, alias)"
 
 
+def _dict_get(mapping, name, alias, sentinel, dict_get):
+    return (
+        val
+        if (val := dict_get(mapping, alias, sentinel)) is not sentinel
+        else mapping[name]
+    )
+
+
 def _get_gserialize(cls: type, field_map: FieldMap):
     args = []
     builder = (
         MethodBuilder(
             "__gserialize__",
             {
-                "dict_get": dict.get,
+                "dict_get": _dict_get,
+                "sentinel": object(),
+                "_dict_get": dict.get,
             },
         )
         .add_funcarg("mapping")
@@ -378,31 +419,21 @@ def _get_gserialize(cls: type, field_map: FieldMap):
     for field in field_map.values():
         field_type = field.origin or field.declared_type
         builder.add_glob(f"_field_type_{field.name}", field_type)
+        get_line = (
+            f"dict_get(mapping, {field.name!r}, {field.alias!r},"
+            "sentinel, _dict_get)"
+        )
         if hasattr(field_type, "__gserialize__"):
-            arg = (
-                f"_field_type_{field.name}.__gserialize__"
-                f"(dict_get(mapping, '{field.alias}')"
-                f" or mapping['{field.name}'])"
-            )
+            arg = f"_field_type_{field.name}.__gserialize__({get_line})"
         elif field_type in (date, datetime):
-            arg = (
-                f"_field_type_{field.name}.fromisoformat"
-                f"(dict_get(mapping, '{field.alias}')"
-                f" or mapping['{field.name}'])"
-            )
+            arg = f"_field_type_{field.name}.fromisoformat" f"({get_line})"
         elif not isinstance(field_type, type):
-            arg = (
-                f"(dict_get(mapping, '{field.alias}')"
-                f" or mapping['{field.name}'])"
-            )
+            arg = f"({get_line})"
         elif issubclass(field_type, (list, tuple, set, dict)):
             arg, globs = _get_gserialize_sequence_arg(field)
             builder.merge_globs(globs)
         else:
-            arg = (
-                f"(dict_get(mapping, '{field.alias}')"
-                f" or mapping['{field.name}'])"
-            )
+            arg = f"({get_line})"
         args.append(f"{field.alias}={arg}")
     builder.add_scriptline(f"return cls({', '.join(args)})")
     return builder.build(cls)
@@ -414,7 +445,8 @@ def _get_gserialize_sequence_arg(
     field_type = field.origin or field.declared_type
     globs = {}
     default_line = (
-        f"(dict_get(mapping, '{field.alias}')" f" or mapping['{field.name}'])"
+        f"dict_get(mapping, {field.name!r}, {field.alias!r},"
+        "sentinel, _dict_get)"
     )
 
     returnline = default_line
@@ -457,11 +489,13 @@ def _get_ne(cls: type):
         MethodBuilder("__ne__")
         .add_funcarg(_othername)
         .add_annotation("return", bool)
-        .add_scriptline("result = self.__eq__(other)")
-        .add_scriptline("if result is NotImplemented:")
-        .add_scriptline(indent("return NotImplemented", skip_line=False))
-        .add_scriptline("else:")
-        .add_scriptline(indent("return not result", skip_line=False))
+        .add_scriptlines(
+            "result = self.__eq__(other)",
+            "if result is NotImplemented:",
+            indent("return NotImplemented"),
+            "else:",
+            indent("return not result"),
+        )
         .build(cls)
     )
 
@@ -511,8 +545,8 @@ def _make_comparator_builder(name: str, signal: str, field_map: FieldMap):
     return (
         builder.add_funcarg(_othername)
         .add_annotation("return", bool)
-        .add_scriptline("if type(other) is type(self):")
-        .add_scriptline(
+        .add_scriptlines(
+            "if type(other) is type(self):",
             indent(
                 "return "
                 + f" {signal} ".join(
@@ -521,10 +555,9 @@ def _make_comparator_builder(name: str, signal: str, field_map: FieldMap):
                         attr_tuple.format(target="other"),
                     )
                 ),
-                skip_line=False,
-            )
+            ),
+            "return NotImplemented",
         )
-        .add_scriptline("return NotImplemented")
     )
 
 
@@ -550,3 +583,163 @@ def _get_hash(cls: type, fields_map: FieldMap, wants_hash: bool):
         .add_annotation("return", int)
         .build(cls)
     )
+
+
+def _maybe_get_pydantic(cls: type, fields_map: FieldMap, wants_pydantic: bool):
+    try:
+        return _get_pydantic_handlers(cls, fields_map)
+    except Exception:
+        if wants_pydantic:
+            raise
+        return {}
+
+
+def _get_pydantic_handlers(cls: type, fields_map: FieldMap):
+    namespace = {}
+
+    # Create Validation Function
+    builder = MethodBuilder(
+        "__pydantic_validate__", {"fromdict": fromdict}
+    ).set_type(MethodType.CLASS)
+    builder.add_funcarg("value").add_annotation(
+        "value", typing.Any
+    ).add_annotation("return", cls)
+    builder.add_scriptlines(
+        "if isinstance(value, cls):",
+        indent("return value"),
+        "try:",
+        indent("return fromdict(cls, dict(value))"),
+        "except (TypeError, ValueError) as e:",
+        indent(
+            f"raise TypeError(f'{cls.__name__} expected dict not"
+            " {type(value).__name__}')",
+        ),
+    )
+    namespace |= builder.build(cls)
+
+    # Write Get Validators
+    builder = MethodBuilder("__get_validators__").set_type(MethodType.CLASS)
+
+    builder.add_scriptline("yield cls.__pydantic_validate__ ")
+    namespace |= builder.add_annotation(
+        "return", typing.Generator[typing.Any, typing.Any, Callable]
+    ).build(cls)
+
+    # Make modify schema
+    builder = (
+        MethodBuilder("__modify_schema__")
+        .set_type(MethodType.CLASS)
+        .add_funcarg("field_schema")
+    )
+
+    ("field_schema.update({'type': \"object\"})")
+
+    val = (
+        'field_schema.update({{ \'type\': "object", "properties": {{ {props} }},'
+        ' "required": [{required}],'
+        ' "title": {title}}})'
+    )
+    builder.add_scriptline(
+        val.format(
+            props=", ".join(_generate_schema_lines(fields_map)),
+            required=", ".join(
+                f"{f.argname!r}"
+                for f in fields_map.values()
+                if f.default is MISSING
+            ),
+            title=repr(cls.__name__),
+        )
+    )
+    return namespace | builder.build(cls)
+
+
+def _generate_schema_lines(fields_map: FieldMap):
+    schema_lines = []
+    for field in fields_map.values():
+        field_type = field.field_type
+        if current_map := getattr(field_type, "__gyver_attrs__", None):
+            field_lines = ", ".join(_generate_schema_lines(current_map))
+            required = ",".join(
+                f"{f.argname!r}"
+                for f in current_map.values()
+                if f.default is MISSING
+            )
+            schema_lines.append(
+                f"'{field.argname}': {{ 'title': {field_type.__name__!r}, "
+                f"'type': 'object', 'properties': "
+                f"{{ {field_lines} }}, 'required': [{required}]}}"
+            )
+        else:
+            schema_lines.append(
+                f"'{field.argname}': "
+                f"{_resolve_schematype(field.field_type, field.args)}"
+            )
+
+    return schema_lines
+
+
+def _resolve_schematype(field_type: type, args: typing.Sequence[type]) -> str:
+    _type_map = {
+        type(None): "null",
+        bool: "boolean",
+        str: "string",
+        float: "number",
+        int: "integer",
+    }
+    if val := _type_map.get(field_type):
+        return f"{{'type': {val!r}}}"
+    if field_type in (list, set, tuple):
+        argval = "{}"
+        if args:
+            arg, *_ = args  # only one type is acceptable
+            argval = _resolve_schematype(arg, typing.get_args(arg))
+        return f"{{'type': 'array', 'items': {argval}}}"
+    if field_type is dict:
+        extras = ""
+        if args:
+            keyt, valt = args
+            if keyt is not str:
+                raise TypeError(
+                    f"Cannot generate schema for dict with key type {keyt}",
+                    keyt,
+                )
+            extras = (
+                "'additionalProperties': "
+                f"{{ {_resolve_schematype(valt, typing.get_args(valt))} }}"
+            )
+        return f"{{'type': 'object', {extras}}}"
+    if current_map := getattr(field_type, "__gyver_attrs__", None):
+        field_lines = ", ".join(_generate_schema_lines(current_map))
+        required = ",".join(
+            f"{f.argname!r}"
+            for f in current_map.values()
+            if f.default is MISSING
+        )
+        return (
+            f"{{'title': {field_type.__name__!r}, 'type': 'object', 'properties': "
+            f"{{ {field_lines} }}, 'required': [{required}]}}"
+        )
+    if field_type is typing.Union:
+        argval = ", ".join(
+            _resolve_schematype(arg, typing.get_args(arg)) for arg in args
+        )
+        return f"{{'anyOf': [{argval}]}}"
+    raise NotImplementedError
+
+
+def _make_dataclass_fields(fields_map: FieldMap):
+    dc_fields = {}
+    for field in fields_map.values():
+        kwargs = {}
+        if field.has_default:
+            kwargs["default"] = field.default
+        if field.has_default_factory:
+            kwargs["default_factory"] = field.default
+        if field.eq or field.order:
+            kwargs["compare"] = True
+        dc_field: dataclasses.Field = dataclasses.field(**kwargs)
+        dc_field.name = field.name
+        dc_field.type = field.declared_type
+        dc_field._field_type = dataclasses._FIELD  # type: ignore
+        dc_fields[field.name] = dc_field
+    return {"__dataclass_fields__": dc_fields}

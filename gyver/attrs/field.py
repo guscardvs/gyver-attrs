@@ -1,8 +1,8 @@
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Sequence, Union, overload
 
 from typing_extensions import Self
 
-from gyver.attrs.utils.factory import is_factory_marked
+from gyver.attrs.utils.factory import is_factory_marked, mark_factory
 from gyver.attrs.utils.typedef import MISSING, DisassembledType
 
 
@@ -59,8 +59,14 @@ class Field:
         return self.type_.type_
 
     @property
+    def field_type(self) -> type:
+        return self.origin or self.declared_type
+
+    @property
     def has_default(self) -> bool:
-        return self.default is not MISSING and not is_factory_marked(self.default)
+        return self.default is not MISSING and not is_factory_marked(
+            self.default
+        )
 
     @property
     def has_default_factory(self) -> bool:
@@ -78,10 +84,13 @@ class Field:
             ", ".join(
                 (
                     f"name={self.name}",
-                    f"type={self.type_}",
+                    f"type_={self.type_}",
                     f"default={default_name}",
                     f"kw_only={self.kw_only}",
                     f"alias={self.alias}",
+                    f"eq={self.eq}",
+                    f"order={self.order}",
+                    f"inherited={self.inherited}",
                 )
             )
             + ")"
@@ -120,18 +129,71 @@ class FieldInfo:
     def duplicate(self, **overload):
         return FieldInfo(**self.asdict() | overload)
 
-    def build(self, **extras) -> Field:
-        return Field(**self.asdict() | extras)
+    def build(self, field_cls: type[Field], **extras) -> Field:
+        return field_cls(**self.asdict() | extras)
 
 
+@overload
 def info(
     *,
-    default: Any = ...,
+    default_factory: Callable[[], Any],
     alias: str = "",
     kw_only: bool = False,
     eq: Union[bool, Callable[[Any], Any]] = True,
     order: Union[bool, Callable[[Any], Any]] = True,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
+    ...
+
+
+@overload
+def info(
+    *,
+    default: Any,
+    alias: str = "",
+    kw_only: bool = False,
+    eq: Union[bool, Callable[[Any], Any]] = True,
+    order: Union[bool, Callable[[Any], Any]] = True,
+) -> Any:  # sourcery skip: instance-method-first-arg-name
+    ...
+
+
+@overload
+def info(
+    *,
+    alias: str = "",
+    kw_only: bool = False,
+    eq: Union[bool, Callable[[Any], Any]] = True,
+    order: Union[bool, Callable[[Any], Any]] = True,
+) -> Any:  # sourcery skip: instance-method-first-arg-name
+    ...
+
+
+def info(
+    *,
+    default: Any = ...,
+    default_factory: Callable[[], Any] = ...,
+    alias: str = "",
+    kw_only: bool = False,
+    eq: Union[bool, Callable[[Any], Any]] = True,
+    order: Union[bool, Callable[[Any], Any]] = True,
+) -> Any:  # sourcery skip: instance-method-first-arg-name
+    """
+    Declare metadata for a gyver-attrs field.
+
+    :param default: The default value of the field.
+    :param default_factory: A callable that returns the default value of the field.
+    :param alias: The alternative name for the field.
+    :param kw_only: Whether the field should be a keyword-only parameter in
+    the generated constructor.
+    :param eq: Whether the field should be used in the equality comparison of instances
+    of the class.
+               If a callable is passed, it will be used to compare the field values.
+    :param order: Whether the field should be used in rich comparison ordering
+    of instances of the class.
+                 If a callable is passed, it will be used to compare the field values.
+    """
+    if default_factory is not Ellipsis:
+        default = mark_factory(default_factory)
     return FieldInfo(
         default if default is not Ellipsis else MISSING,
         alias,

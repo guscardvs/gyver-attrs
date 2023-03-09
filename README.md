@@ -1,127 +1,81 @@
 # Gyver Attrs
-===========
 
-Gyver Attrs is a lightweight library that simplifies the creation of Python data classes by providing a single decorator function, `define()`, that automatically adds useful class methods and attributes. With Gyver Attrs, you can easily create data classes that are immutable, hashable, comparable, and optimized for memory usage. Gyver Attrs will also support your descriptors that have private_names in slotted and frozen classes.
+Gyver-attrs is a Python library that provides a more flexible and feature-rich alternative to the built-in attrs and dataclasses libraries for defining classes. The main function provided by Gyver-attrs is define, which allows users to define classes with a range of options and features.
 
-Features
---------
-The `define()` function adds the following features to data classes:
+## Installation
 
-* `__init__()` method for class initialization
-* `__repr__()` method for string representation of the class instance
-* `__eq__()` method for equality comparison of class instances
-* `__ne__()` method for inequality comparison of class instances
-* rich comparison methods (i.e., `__lt__()`, `__le__()`, `__gt__()`, `__ge__()`) for comparing class instances
-* `__hash__()` method for hashable class instances
-* `__slots__`attribute for reducing the memory footprint of class instances
-* Fast converters to transform objects to and from dictionaries and JSON formats. These converters are implemented using a custom conversion library written in Rust and the ORJSON package. The conversion library is provided to offer high performance, making it suitable for large scale data operations.
+To install Gyver-attrs, you can use pip:
 
-To use the converters, the following functions are provided:
-
-* **`asdict(obj)`**: Returns a dictionary containing the attributes of the input object.
-* **`from_dict(type, dict)`**: Creates a new object of the specified type from the given dictionary.
-* **`asjson(obj)`**: Returns a JSON string containing the attributes of the input object.
-* **`from_json(type, obj)`**: Creates a new object of the specified type from the given JSON string.
-
-
-Gyver Attrs uses the function `gyver.attrs.info` and the class `gyver.attrs.FieldInfo` in the same way as you would use `dataclass.field` or `pydantic.Field`. It accepts the following parameters:
-
-* default: the default value for the field.
-* alias: an alias name for the field.
-* kw_only: whether the field is keyword-only.
-* eq: whether the field should be included in the equality comparison method or a callable function for customizing equality comparison.
-* order: whether the field should be included in the rich comparison methods or a callable function for customizing rich comparison.
-
-The info() function returns a new instance of FieldInfo based on the parameters passed in. It accepts the same parameters as FieldInfo. FieldInfo provides additional methods like asdict() to get a dictionary representation of the field information, duplicate() to create a copy of the field with any overrides passed in, and build() to create a Field object based on the field information.
-
-Usage
------
-The `define()` function can be used as a decorator on a data class definition or on an existing data class. It accepts the following keyword arguments:
-
-* `frozen`: whether to create an immutable class or not (default is `True`)
-* `kw_only`: whether to include keyword-only parameters in the constructor or not (default is `False`)
-* `slots`: whether to generate a class using `__slots__` or not (default is `True`)
-* `repr`: whether to generate a `__repr__` method or not (default is `True`)
-* `eq`: whether to generate an `__eq__` method or not (default is `True`)
-* `order`: whether to generate rich comparison methods or not (default is `True`)
-* `hash`: whether to generate a `__hash__` method or not (default is `None`)
-
-Usage Examples
---------
-Here's an example of how to use the `define()` function:
-
-```python
-from gyver_attrs import define
-
-@define
-class MyClass:
-    x: int
-    y: int
-
-@define(frozen=True, hash=True)
-class Person:
-    name: str
-    age: int
-
-p1 = Person(name="Alice", age=25)
-p2 = Person(name="Bob", age=30)
-p3 = Person(name="Alice", age=25)
-
-assert p1 != p2
-assert p1 == p3
-assert hash(p1) == hash(p3)
-
-@define
-class Rectangle:
-    width: float
-    height: float
-
-    def area(self) -> float:
-        return self.width * self.height
-
-    def perimeter(self) -> float:
-        return 2 * (self.width + self.height)
-
-r = Rectangle(width=10.0, height=5.0)
-
-assert r.area() == 50.0
-assert r.perimeter() == 30.0
-
-
-@define(order=False)
-class Point:
-    x: int
-    y: int
-
-    def __add__(self, other: 'Point') -> 'Point':
-        return Point(self.x + other.x, self.y + other.y)
-
-    def __sub__(self, other: 'Point') -> 'Point':
-        return Point(self.x - other.x, self.y - other.y)
-
-p1 = Point(x=1, y=2)
-p2 = Point(x=3, y=4)
-
-assert p1 + p2 == Point(x=4, y=6)
-assert p2 - p1 == Point(x=2, y=2)
-```
-
-Installation
---------
-You can install gyver-attrs using pip
 ```console
 pip install gyver-attrs
 ```
 
-Contributing
---------
-Contributions are welcome! Here are the steps to get started:
-* Fork the repository and clone it locally.
-* Install the required dependencies with **`poetry install --all-extras`**.
-* Create a new branch for your changes with **`git checkout -b my-branch`**.
-* Make your desired changes.
-* Ensure that all tests pass with **`make test`**.
-* Format the code with **`make format`**.
-* Push your changes to your fork and create a pull request.
+## Usage
 
-Thank you for contributing to gyver-attrs!
+The primary function in Gyver-attrs is define. It takes a list of field definitions and returns a new class with those fields defined as attributes. Here is a basic example:
+
+```python
+from gyver_attrs import define, info
+
+@define
+class Person:
+    name: str
+    age: int = info(default=18)
+```
+This defines a new class `Person` with two attributes, `name` and `age`.
+
+## Features
+
+Gyver-attrs provides a range of features that can be used to customize how classes are defined. These features include:
+
+- maybe_cls: This option allows you to optionally specify the class to be created with the features applied. If it is None, it returns a callable that can wrap classes in the same way.
+- frozen: This option replaces **`__setattr__`** and **`__getattr__`** of the class with frozen versions that raise AttributeError when attributes are accessed or modified. This can be useful for creating immutable objects.
+- kw_only: This option makes the class's **`__init__`** not accept positional arguments, forcing all arguments to be passed as keyword arguments.
+- slots: This option adds a **`__slots__`** to the class with the necessary validations and compliances with inheritance. It also validates possible descriptors with **`__set_name__`** to add the expected name to the **`__slots__`**.
+- repr: This option adds a **`__repr__`** method to the resulting class.
+- eq: This option provides **`__eq__`** and **`__ne__`** methods for the resulting class, comparing all values against each other. Each field can have a parser or opt-out using field(eq=False) or field(eq=my_converter).
+- order: This option adds rich comparison support and supports the same mechanism of opt-out/converter as eq.
+- hash: This option adds a hash function if all values are hashable and considers the converter from eq as well.
+- pydantic: This option adds **`__get_validators__`** to the class to make Pydantic support the classes by default.
+- dataclass_support: This option adds **`__dataclass_fields__`** with each field converted to a dataclass.Field before returning it on a dict. This way, the class becomes a drop-in replacement for dataclasses.
+
+**Warning**: dataclass_fields with pydantic=False will fail when trying to use with pydantic.
+
+## Methods
+
+Gyver-attrs will add the following methods to your class.
+
+__gyver_attrs__: This is a dictionary that maps each attribute name to its corresponding Field object. The Field object contains metadata about the attribute such as its name, type, default value, etc.
+__parse_dict__(): This is a method that is used to parse the instance into a dict, recursively. Don't use it directly, instead call `asdict(self)`.
+__iter__(): This will yield (key, value) for all fields directly included in the class, and not any fields of nested objects. You can use as `dict(self)`
+__gserialize__(): This is a class method that is used to serialize a dict into an instance of the class. Don't use it directly, instead call `fromdict(self)`.
+__pydantic_validate__(): This will validate inputs to support pydantic integration.
+__get_validators__(): This is a classmethod to make your class pydantic-compatible.
+__modify_schema__(): This is a class method that create schemas for your class when using Pydantic/FastAPI.
+
+Also Gyver-attrs will not override custom defined functions instead, on conflict, you can still find them with the prefix `__gattrs_`.
+Examples:
+    `__init__` => `__gattrs_init__`
+    `__hash__` => `__gattrs_hash__`
+    `__parse_dict__` => `__gattrs_parse_dict__`
+
+## Helper Functions
+
+Gyver-attrs provides helpers to integrate easily with your project
+
+- Shortcuts
+  - `mutable`: same as `define` but with frozen=True
+  - `kw_only`: same as `define` but with kw_only=True
+- Camel
+  - `define_camel`: same as `define` but with alias automatically as camel case. This can be either lower or upper camel which can be done by `style="upper"` or `style="lower`. By default `define_camel` uses lower.
+- Helpers:
+  - `call_init`: calls `__gattrs_init__` without mypy or pyright complaining
+  - `fields`: returns a `dict[str, Field]` of the class, by returning `__gyver_attrs__`
+- Factory:
+  - `mark_factory`: decorator to mark function as factory
+- Converters:
+  - `fromdict`/`fromjson`: creates instance of class based on a dict/json(using orjson). Use as `fromdict(YourClass, mapping)` or `fromjson(YourClass, yourjson)`
+  - `asdict`/`asjson`: returns your instance as dict/json(using orjson) recursively. Use as `asdict(instance, by_alias=True)` or `asdict(instance, by_alias=False)`
+
+## Conclusion
+Gyver-attrs provides a powerful and flexible way to define classes in Python, with a range of options and features that can be used to customize the behavior of the resulting classes. Whether you're building small scripts or large applications, Gyver-attrs can help you create classes that are tailored to your specific needs.

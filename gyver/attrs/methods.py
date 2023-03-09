@@ -23,13 +23,17 @@ class MethodBuilder:
         self.method_name = method_name
         self.globs = globs or {}
         self.script_lines: list[str] = []
-        self.annotations: dict[str, Union[type, None, EllipsisType]] = {}
+        self.annotations: dict[str, Union[type, None]] = {}
         self.funcargs: list[str] = []
         self.funckargs: list[str] = []
         self.meth_type = MethodType.INSTANCE
 
     def add_scriptline(self, line: str) -> Self:
         self.script_lines.append(line)
+        return self
+
+    def add_scriptlines(self, *lines) -> Self:
+        self.script_lines.extend(lines)
         return self
 
     def add_glob(self, name: str, value: Any) -> Self:
@@ -40,7 +44,7 @@ class MethodBuilder:
         self.globs |= globs
         return self
 
-    def add_annotation(self, name: str, value: Union[type, None, EllipsisType]) -> Self:
+    def add_annotation(self, name: str, value: Union[type, None]) -> Self:
         self.annotations[name] = value
         return self
 
@@ -93,7 +97,9 @@ class MethodBuilder:
             args += f'{", " if args else ""}*, {", ".join(self.funckargs)}'
         method_signature = method_header + args + method_footer
 
-        method_body = "\n    ".join(self.script_lines) if self.script_lines else "pass"
+        method_body = (
+            "\n    ".join(self.script_lines) if self.script_lines else "pass"
+        )
         if method_decorator:
             method_signature = method_decorator + method_signature
 

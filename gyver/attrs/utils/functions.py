@@ -28,7 +28,7 @@ def frozen(cls: type[T]) -> type[T]:
     return cls
 
 
-def indent(string: str, *, skip_line: bool) -> str:
+def indent(string: str, *, skip_line: bool = False) -> str:
     returnstr = f"    {string}"
     if skip_line:
         returnstr = "\n" + returnstr
