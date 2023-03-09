@@ -1,7 +1,9 @@
+import dataclasses
 from typing import Sequence, cast
 
 from .field import Field, FieldInfo, default_info
 from .utils.functions import disassemble_type
+from .utils.factory import is_factory_marked, mark_factory
 from .utils.typedef import MISSING
 
 
@@ -13,15 +15,23 @@ class FieldsBuilder:
         "parent_fields",
         "fields",
         "field_class",
+        "dataclass_fields",
     )
 
-    def __init__(self, cls: type, kw_only: bool, field_class: type[Field]):
+    def __init__(
+        self,
+        cls: type,
+        kw_only: bool,
+        field_class: type[Field],
+        dataclass_fields: bool,
+    ):
         self.cls = cls
         self.kw_only = kw_only
         self.field_names: set[str] = set()
         self.parent_fields: list[Field] = []
         self.fields: list[Field] = []
         self.field_class = field_class
+        self.dataclass_fields = dataclass_fields
 
     def build(self):
         self._add_parent_fields()
@@ -53,6 +63,8 @@ class FieldsBuilder:
         info = default_info.duplicate(default=default)
         if isinstance(default, FieldInfo):
             info = default
+        elif isinstance(default, dataclasses.Field) and self.dataclass_fields:
+            info = self._info_from_dc(default)
         field = info.build(
             self.field_class,
             name=key,
@@ -69,6 +81,24 @@ class FieldsBuilder:
         for key, val in self.cls.__annotations__.items():
             self.add_field(key, val)
         return self
+
+    def _info_from_dc(self, field: dataclasses.Field) -> FieldInfo:
+        kwargs = {}
+        if field.default_factory is not dataclasses.MISSING:
+            kwargs["default"] = (
+                field.default_factory
+                if is_factory_marked(field.default_factory)
+                else mark_factory(field.default_factory)
+            )
+        elif field.default is not dataclasses.MISSING:
+            kwargs["default"] = field.default
+        else:
+            kwargs["default"] = MISSING
+        if not field.init:
+            raise TypeError("Unable to handle non init fields")
+        if not field.compare:
+            kwargs["eq"] = kwargs["order"] = False
+        return FieldInfo(**kwargs)
 
 
 def _validate_fields_order(fields: list[Field]):

@@ -108,7 +108,9 @@ def define(
 
     def wrap(cls: type[T]) -> type[T]:
         fields = (
-            FieldsBuilder(cls, kw_only, field_class).from_annotations().build()
+            FieldsBuilder(cls, kw_only, field_class, dataclass_fields)
+            .from_annotations()
+            .build()
         )
         field_map = {field.name: field for field in fields}
         clsdict = (
