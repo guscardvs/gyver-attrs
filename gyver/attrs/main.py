@@ -1,7 +1,8 @@
 import dataclasses
+from enum import Enum
 import typing
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 
 import typing_extensions
 
@@ -13,6 +14,7 @@ from gyver.attrs.converters.utils import (
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
+from gyver.attrs import schema
 from gyver.attrs.utils.functions import frozen as freeze
 from gyver.attrs.utils.functions import indent
 from gyver.attrs.utils.typedef import MISSING, Descriptor, InitOptions
@@ -635,52 +637,42 @@ def _get_pydantic_handlers(cls: type, fields_map: FieldMap):
     )
 
     ("field_schema.update({'type': \"object\"})")
-
-    val = (
-        'field_schema.update({{ \'type\': "object", "properties": {{ {props} }},'
-        ' "required": [{required}],'
-        ' "title": {title}}})'
+    cls_schema = schema.Schema(
+        cls.__name__,
+        "object",
+        [f.argname for f in fields_map.values() if f.default is MISSING],
+        properties=_generate_schema_lines(fields_map),
     )
     builder.add_scriptline(
-        val.format(
-            props=", ".join(_generate_schema_lines(fields_map)),
-            required=", ".join(
-                f"{f.argname!r}"
-                for f in fields_map.values()
-                if f.default is MISSING
-            ),
-            title=repr(cls.__name__),
-        )
+        "field_schema.update({schema})".format(schema=cls_schema.to_string())
     )
     return namespace | builder.build(cls)
 
 
-def _generate_schema_lines(fields_map: FieldMap):
-    schema_lines = []
+def _generate_schema_lines(fields_map: FieldMap) -> dict[str, schema.HasStr]:
+    schemas: dict[str, schema.HasStr] = {}
     for field in fields_map.values():
         field_type = field.field_type
         if current_map := getattr(field_type, "__gyver_attrs__", None):
-            field_lines = ", ".join(_generate_schema_lines(current_map))
-            required = ",".join(
-                f"{f.argname!r}"
-                for f in current_map.values()
-                if f.default is MISSING
-            )
-            schema_lines.append(
-                f"'{field.argname}': {{ 'title': {field_type.__name__!r}, "
-                f"'type': 'object', 'properties': "
-                f"{{ {field_lines} }}, 'required': [{required}]}}"
+            required = [
+                f.argname for f in current_map.values() if f.default is MISSING
+            ]
+            schemas[field.argname] = schema.Schema(
+                field_type.__name__,
+                "object",
+                required,
+                properties=_generate_schema_lines(current_map),
             )
         else:
-            schema_lines.append(
-                f"'{field.argname}': "
-                f"{_resolve_schematype(field.field_type, field.args)}"
+            schemas[field.argname] = _resolve_schematype(
+                field.field_type, field.args
             )
+    return schemas
 
-    return schema_lines
 
-
-def _resolve_schematype(field_type: type, args: typing.Sequence[type]) -> str:
+def _resolve_schematype(
+    field_type: type, args: typing.Sequence[type]
+) -> schema.HasToString:
     _type_map = {
         type(None): "null",
         bool: "boolean",
@@ -689,15 +681,19 @@ def _resolve_schematype(field_type: type, args: typing.Sequence[type]) -> str:
         int: "integer",
     }
     if val := _type_map.get(field_type):
-        return f"{{'type': {val!r}}}"
+        return schema.DictSchema(val)
     if field_type in (list, set, tuple):
-        argval = "{}"
+        extras = {}
         if args:
-            arg, *_ = args  # only one type is acceptable
-            argval = _resolve_schematype(arg, typing.get_args(arg))
-        return f"{{'type': 'array', 'items': {argval}}}"
+            extras["items"] = schema.Items(
+                *(
+                    _resolve_schematype(arg, typing.get_args(arg))
+                    for arg in args
+                )
+            )
+        return schema.DictSchema("array", **extras)
     if field_type is dict:
-        extras = ""
+        extras = {}
         if args:
             keyt, valt = args
             if keyt is not str:
@@ -705,27 +701,51 @@ def _resolve_schematype(field_type: type, args: typing.Sequence[type]) -> str:
                     f"Cannot generate schema for dict with key type {keyt}",
                     keyt,
                 )
-            extras = (
-                "'additionalProperties': "
-                f"{{ {_resolve_schematype(valt, typing.get_args(valt))} }}"
+            extras["additional_properties"] = _resolve_schematype(
+                valt, typing.get_args(valt)
             )
-        return f"{{'type': 'object', {extras}}}"
+        return schema.DictSchema("object", **extras)
     if current_map := getattr(field_type, "__gyver_attrs__", None):
-        field_lines = ", ".join(_generate_schema_lines(current_map))
-        required = ",".join(
-            f"{f.argname!r}"
-            for f in current_map.values()
-            if f.default is MISSING
-        )
-        return (
-            f"{{'title': {field_type.__name__!r}, 'type': 'object', 'properties': "
-            f"{{ {field_lines} }}, 'required': [{required}]}}"
+        required = [
+            f.argname for f in current_map.values() if f.default is MISSING
+        ]
+        return schema.Schema(
+            field_type.__name__,
+            "object",
+            required,
+            properties=_generate_schema_lines(current_map),
         )
     if field_type is typing.Union:
-        argval = ", ".join(
+        choices = [
             _resolve_schematype(arg, typing.get_args(arg)) for arg in args
+        ]
+        return schema.ListSchema("anyOf", *choices)
+    if issubclass(field_type, Enum):
+        # remove from parents cls, enum.Enum and object
+        # uses only the first of the mro
+        parent, *_ = field_type.mro()[1:-2]
+        if parent:
+            if ft := _type_map.get(parent):
+                type_name = ft
+            else:
+                raise NotImplementedError
+        else:
+            type_name = "string"
+        return schema.Schema(
+            field_type.__name__,
+            type_name,
+            enum=schema.Items(*[f'"{item.value}"' for item in field_type]),
         )
-        return f"{{'anyOf': [{argval}]}}"
+    if issubclass(field_type, datetime):
+        return schema.DictSchema("string", format=schema.str_cast("date-time"))
+    if issubclass(field_type, date):
+        return schema.DictSchema("string", format=schema.str_cast("date"))
+    if issubclass(field_type, time):
+        return schema.DictSchema("string", format=schema.str_cast("time"))
+    if issubclass(field_type, timedelta):
+        return schema.DictSchema(
+            "number", format=schema.str_cast("time-delta")
+        )
     raise NotImplementedError
 
 

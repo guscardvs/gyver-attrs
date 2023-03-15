@@ -1,23 +1,12 @@
-import re
 import typing_extensions
 
 from gyver.attrs.main import define
 from .field import Field, FieldInfo, info
 from typing import Literal, Optional, TypeVar, Union, Callable, Any, overload
 from .utils.typedef import DisassembledType
-
-_to_camel_regex = re.compile("_([a-zA-Z])")
+from .utils.functions import to_camel, to_upper_camel
 
 T = TypeVar("T")
-
-
-def to_camel(string: str) -> str:
-    return _to_camel_regex.sub(lambda match: match[1].upper(), string)
-
-
-def to_upper_camel(string: str) -> str:
-    result = to_camel(string)
-    return result[:1].upper() + result[1:]
 
 
 class ToCamelField(Field):
