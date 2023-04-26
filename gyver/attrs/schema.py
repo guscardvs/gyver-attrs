@@ -1,4 +1,5 @@
 from typing import Protocol, Sequence, Union
+
 from .utils.functions import to_camel
 
 template = (
@@ -53,8 +54,7 @@ class DictSchema:
             + (
                 " {"
                 + ", ".join(
-                    f'"{to_camel(key)}": {value!s}'
-                    for key, value in props.items()
+                    f'"{to_camel(key)}": {value!s}' for key, value in props.items()
                 )
                 + "}"
                 if isinstance(props, dict)
@@ -157,7 +157,7 @@ class Schema:
 
     def _make_prop_str(self, props: PropsType):
         if not isinstance(props, dict):
-            return props.to_string()
+            return str(props)
         props_str = ",".join(
             f'"{to_camel(key)}": {value!s}' for key, value in props.items()
         )

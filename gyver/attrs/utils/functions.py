@@ -45,11 +45,7 @@ def implements(cls: type, name: str):
         return False
 
     return next(
-        (
-            False
-            for base_cls in cls.mro()[1:]
-            if getattr(base_cls, name, None) is attr
-        ),
+        (False for base_cls in cls.mro()[1:] if getattr(base_cls, name, None) is attr),
         True,
     )
 
@@ -58,9 +54,7 @@ _to_camel_regex = re.compile("_([a-zA-Z])")
 
 
 def to_camel(string: str) -> str:
-    return _to_camel_regex.sub(
-        lambda match: match[1].upper(), string.strip("_")
-    )
+    return _to_camel_regex.sub(lambda match: match[1].upper(), string.strip("_"))
 
 
 def to_upper_camel(string: str) -> str:

@@ -1,20 +1,17 @@
 import dataclasses
-from enum import Enum
 import typing
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
+from enum import Enum
 
 import typing_extensions
 
-from gyver.attrs.converters.utils import (
-    deserialize,
-    deserialize_mapping,
-    fromdict,
-)
+from gyver.attrs import schema
+from gyver.attrs.converters.utils import (deserialize, deserialize_mapping,
+                                          fromdict)
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
-from gyver.attrs import schema
 from gyver.attrs.utils.functions import frozen as freeze
 from gyver.attrs.utils.functions import indent
 from gyver.attrs.utils.typedef import MISSING, Descriptor, InitOptions
@@ -36,7 +33,7 @@ def define(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: typing.Optional[bool] = None,
+    pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
 ) -> Callable[[type[T]], type[T]]:
@@ -55,7 +52,7 @@ def define(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: typing.Optional[bool] = None,
+    pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
 ) -> type[T]:
@@ -79,7 +76,7 @@ def define(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: typing.Optional[bool] = None,
+    pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
 ) -> typing.Union[Callable[[type[T]], type[T]], type[T]]:
@@ -133,8 +130,8 @@ def define(
             clsdict |= _get_order(cls, field_map)
         if hash or (hash is None and frozen):
             clsdict |= _get_hash(cls, field_map, bool(hash))
-        if pydantic is not False:
-            clsdict |= _maybe_get_pydantic(cls, field_map, pydantic is True)
+        if pydantic:
+            clsdict |= _get_pydantic_handlers(cls, field_map)
         if dataclass_fields:
             clsdict |= _make_dataclass_fields(field_map)
         maybe_freeze = freeze if frozen else lambda a: a
@@ -164,17 +161,14 @@ def _get_slots_metadata(
     inherited_slots: dict[str, typing.Any] = {}
     for base_cls in cls.mro()[1:-1]:
         inherited_slots |= {
-            name: getattr(base_cls, name)
-            for name in getattr(base_cls, "__slots__", ())
+            name: getattr(base_cls, name) for name in getattr(base_cls, "__slots__", ())
         }
     reused_slots = {
         slot: descriptor
         for slot, descriptor in inherited_slots.items()
         if slot in field_map
     }
-    slot_names = tuple(
-        field for field in field_map if field not in reused_slots
-    )
+    slot_names = tuple(field for field in field_map if field not in reused_slots)
     for value in cls.__dict__.values():
         if _is_descriptor_type(value):
             slot_names += (value.private_name,)
@@ -194,9 +188,7 @@ def _get_cls_metadata(cls: type):
 def _make_setattr(frozen: bool):
     def _setattr(field: str, arg: typing.Any):
         return (
-            f"_setattr(self, '{field}', {arg})"
-            if frozen
-            else f"self.{field} = {arg}"
+            f"_setattr(self, '{field}', {arg})" if frozen else f"self.{field} = {arg}"
         )
 
     return _setattr
@@ -268,9 +260,7 @@ _othername = "other"
 
 def _get_eq(cls: type, field_map: FieldMap):
     fields_to_compare = {
-        name: field
-        for name, field in field_map.items()
-        if field.eq is not False
+        name: field for name, field in field_map.items() if field.eq is not False
     }
     builder = MethodBuilder("__eq__").add_funcarg(_othername)
     if fields_to_compare:
@@ -329,8 +319,7 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
         field_type = field.origin or field.declared_type
         if isinstance(field_type, str):
             raise NotImplementedError(
-                "For now gyver-attrs cannot deal correctly"
-                " with forward references"
+                "For now gyver-attrs cannot deal correctly" " with forward references"
             )
         builder.add_glob(f"field_type_{field.name}", field_type)
         if hasattr(field_type, "__parse_dict__"):
@@ -424,8 +413,7 @@ def _get_gserialize(cls: type, field_map: FieldMap):
         field_type = field.origin or field.declared_type
         builder.add_glob(f"_field_type_{field.name}", field_type)
         get_line = (
-            f"dict_get(mapping, {field.name!r}, {field.alias!r},"
-            "sentinel, _dict_get)"
+            f"dict_get(mapping, {field.name!r}, {field.alias!r}," "sentinel, _dict_get)"
         )
         if hasattr(field_type, "__gserialize__"):
             arg = f"_field_type_{field.name}.__gserialize__({get_line})"
@@ -449,8 +437,7 @@ def _get_gserialize_sequence_arg(
     field_type = field.origin or field.declared_type
     globs = {}
     default_line = (
-        f"dict_get(mapping, {field.name!r}, {field.alias!r},"
-        "sentinel, _dict_get)"
+        f"dict_get(mapping, {field.name!r}, {field.alias!r}," "sentinel, _dict_get)"
     )
 
     returnline = default_line
@@ -589,25 +576,16 @@ def _get_hash(cls: type, fields_map: FieldMap, wants_hash: bool):
     )
 
 
-def _maybe_get_pydantic(cls: type, fields_map: FieldMap, wants_pydantic: bool):
-    try:
-        return _get_pydantic_handlers(cls, fields_map)
-    except Exception:
-        if wants_pydantic:
-            raise
-        return {}
-
-
 def _get_pydantic_handlers(cls: type, fields_map: FieldMap):
     namespace = {}
 
     # Create Validation Function
-    builder = MethodBuilder(
-        "__pydantic_validate__", {"fromdict": fromdict}
-    ).set_type(MethodType.CLASS)
-    builder.add_funcarg("value").add_annotation(
-        "value", typing.Any
-    ).add_annotation("return", cls)
+    builder = MethodBuilder("__pydantic_validate__", {"fromdict": fromdict}).set_type(
+        MethodType.CLASS
+    )
+    builder.add_funcarg("value").add_annotation("value", typing.Any).add_annotation(
+        "return", cls
+    )
     builder.add_scriptlines(
         "if isinstance(value, cls):",
         indent("return value"),
@@ -654,9 +632,7 @@ def _generate_schema_lines(fields_map: FieldMap) -> dict[str, schema.HasStr]:
     for field in fields_map.values():
         field_type = field.field_type
         if current_map := getattr(field_type, "__gyver_attrs__", None):
-            required = [
-                f.argname for f in current_map.values() if f.default is MISSING
-            ]
+            required = [f.argname for f in current_map.values() if f.default is MISSING]
             schemas[field.argname] = schema.Schema(
                 field_type.__name__,
                 "object",
@@ -664,9 +640,7 @@ def _generate_schema_lines(fields_map: FieldMap) -> dict[str, schema.HasStr]:
                 properties=_generate_schema_lines(current_map),
             )
         else:
-            schemas[field.argname] = _resolve_schematype(
-                field.field_type, field.args
-            )
+            schemas[field.argname] = _resolve_schematype(field.field_type, field.args)
     return schemas
 
 
@@ -686,10 +660,7 @@ def _resolve_schematype(
         extras = {}
         if args:
             extras["items"] = schema.Items(
-                *(
-                    _resolve_schematype(arg, typing.get_args(arg))
-                    for arg in args
-                )
+                *(_resolve_schematype(arg, typing.get_args(arg)) for arg in args)
             )
         return schema.DictSchema("array", **extras)
     if field_type is dict:
@@ -706,9 +677,7 @@ def _resolve_schematype(
             )
         return schema.DictSchema("object", **extras)
     if current_map := getattr(field_type, "__gyver_attrs__", None):
-        required = [
-            f.argname for f in current_map.values() if f.default is MISSING
-        ]
+        required = [f.argname for f in current_map.values() if f.default is MISSING]
         return schema.Schema(
             field_type.__name__,
             "object",
@@ -716,9 +685,7 @@ def _resolve_schematype(
             properties=_generate_schema_lines(current_map),
         )
     if field_type is typing.Union:
-        choices = [
-            _resolve_schematype(arg, typing.get_args(arg)) for arg in args
-        ]
+        choices = [_resolve_schematype(arg, typing.get_args(arg)) for arg in args]
         return schema.ListSchema("anyOf", *choices)
     if issubclass(field_type, Enum):
         # remove from parents cls, enum.Enum and object
@@ -743,9 +710,7 @@ def _resolve_schematype(
     if issubclass(field_type, time):
         return schema.DictSchema("string", format=schema.str_cast("time"))
     if issubclass(field_type, timedelta):
-        return schema.DictSchema(
-            "number", format=schema.str_cast("time-delta")
-        )
+        return schema.DictSchema("number", format=schema.str_cast("time-delta"))
     raise NotImplementedError
 
 

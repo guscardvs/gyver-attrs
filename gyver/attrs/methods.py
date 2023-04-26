@@ -97,9 +97,7 @@ class MethodBuilder:
             args += f'{", " if args else ""}*, {", ".join(self.funckargs)}'
         method_signature = method_header + args + method_footer
 
-        method_body = (
-            "\n    ".join(self.script_lines) if self.script_lines else "pass"
-        )
+        method_body = "\n    ".join(self.script_lines) if self.script_lines else "pass"
         if method_decorator:
             method_signature = method_decorator + method_signature
 

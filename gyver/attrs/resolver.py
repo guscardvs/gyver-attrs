@@ -2,8 +2,8 @@ import dataclasses
 from typing import Sequence, cast
 
 from .field import Field, FieldInfo, default_info
-from .utils.functions import disassemble_type
 from .utils.factory import is_factory_marked, mark_factory
+from .utils.functions import disassemble_type
 from .utils.typedef import MISSING
 
 

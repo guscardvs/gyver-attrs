@@ -1,7 +1,9 @@
 import typing
+
 import typing_extensions
-from .main import define
+
 from .field import FieldInfo, info
+from .main import define
 
 T = typing.TypeVar("T")
 
@@ -64,7 +66,7 @@ def mutable(
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
-        frozen=True,
+        frozen=False,
         kw_only=kw_only,
         slots=slots,
         repr=repr,
@@ -139,5 +141,72 @@ def kw_only(
         order=order,
         hash=hash,
         pydantic=pydantic,
+        dataclass_fields=dataclass_fields,
+    )
+
+
+@typing.overload
+def schema_class(
+    maybe_cls: None = None,
+    /,
+    *,
+    frozen: bool = False,
+    kw_only: bool = False,
+    slots: bool = True,
+    repr: bool = True,
+    eq: bool = True,
+    order: bool = True,
+    hash: typing.Optional[bool] = None,
+    dataclass_fields: bool = True,
+) -> typing.Callable[[type[T]], type[T]]:
+    ...
+
+
+@typing.overload
+def schema_class(
+    maybe_cls: type[T],
+    /,
+    *,
+    frozen: bool = False,
+    kw_only: bool = False,
+    slots: bool = True,
+    repr: bool = True,
+    eq: bool = True,
+    order: bool = True,
+    hash: typing.Optional[bool] = None,
+    dataclass_fields: bool = True,
+) -> type[T]:
+    ...
+
+
+@typing_extensions.dataclass_transform(
+    order_default=True,
+    frozen_default=True,
+    kw_only_default=False,
+    field_specifiers=(FieldInfo, info),
+)
+def schema_class(
+    maybe_cls: OptionalTypeT[T] = None,
+    /,
+    *,
+    frozen: bool = True,
+    kw_only: bool = False,
+    slots: bool = True,
+    repr: bool = True,
+    eq: bool = True,
+    order: bool = True,
+    hash: typing.Optional[bool] = None,
+    dataclass_fields: bool = True,
+) -> ReturnT[T]:
+    return define(
+        maybe_cls,
+        frozen=frozen,
+        kw_only=kw_only,
+        slots=slots,
+        repr=repr,
+        eq=eq,
+        order=order,
+        hash=hash,
+        pydantic=True,
         dataclass_fields=dataclass_fields,
     )

@@ -1,10 +1,12 @@
+from typing import Any, Callable, Literal, Optional, TypeVar, Union, overload
+
 import typing_extensions
 
 from gyver.attrs.main import define
+
 from .field import Field, FieldInfo, info
-from typing import Literal, Optional, TypeVar, Union, Callable, Any, overload
-from .utils.typedef import DisassembledType
 from .utils.functions import to_camel, to_upper_camel
+from .utils.typedef import DisassembledType
 
 T = TypeVar("T")
 

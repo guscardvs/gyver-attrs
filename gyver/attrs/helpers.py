@@ -1,6 +1,7 @@
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast
-from typing_extensions import ParamSpec, Concatenate
+
+from typing_extensions import Concatenate, ParamSpec
 
 from .field import Field
 

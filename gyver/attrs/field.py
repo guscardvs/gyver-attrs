@@ -64,9 +64,7 @@ class Field:
 
     @property
     def has_default(self) -> bool:
-        return self.default is not MISSING and not is_factory_marked(
-            self.default
-        )
+        return self.default is not MISSING and not is_factory_marked(self.default)
 
     @property
     def has_default_factory(self) -> bool:
