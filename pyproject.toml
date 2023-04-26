@@ -10,7 +10,7 @@ packages = [{ include = "gyver" }]
 python = "^3.9"
 typing-extensions = "^4.5.0"
 orjson = { version = "^3.8.6" }
-gyver-attrs-converter = { version = "^0.5.0" }
+gyver-attrs-converter = { version = "^0.4.1" }
 
 
 [tool.poetry.group.lint.dependencies]
