@@ -22,8 +22,8 @@ def mutable(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: bool = True,
-    dataclass_fields: bool = True,
+    pydantic: bool = False,
+    dataclass_fields: bool = False,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -39,8 +39,8 @@ def mutable(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: bool = True,
-    dataclass_fields: bool = True,
+    pydantic: bool = False,
+    dataclass_fields: bool = False,
 ) -> type[T]:
     ...
 
@@ -61,8 +61,8 @@ def mutable(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: bool = True,
-    dataclass_fields: bool = True,
+    pydantic: bool = False,
+    dataclass_fields: bool = False,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
@@ -89,8 +89,8 @@ def kw_only(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: bool = True,
-    dataclass_fields: bool = True,
+    pydantic: bool = False,
+    dataclass_fields: bool = False,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -106,8 +106,8 @@ def kw_only(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: bool = True,
-    dataclass_fields: bool = True,
+    pydantic: bool = False,
+    dataclass_fields: bool = False,
 ) -> type[T]:
     ...
 
@@ -128,8 +128,8 @@ def kw_only(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    pydantic: bool = True,
-    dataclass_fields: bool = True,
+    pydantic: bool = False,
+    dataclass_fields: bool = False,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
@@ -157,7 +157,7 @@ def schema_class(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    dataclass_fields: bool = True,
+    dataclass_fields: bool = False,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -174,7 +174,7 @@ def schema_class(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    dataclass_fields: bool = True,
+    dataclass_fields: bool = False,
 ) -> type[T]:
     ...
 
@@ -196,7 +196,7 @@ def schema_class(
     eq: bool = True,
     order: bool = True,
     hash: typing.Optional[bool] = None,
-    dataclass_fields: bool = True,
+    dataclass_fields: bool = False,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
