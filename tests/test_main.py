@@ -6,6 +6,10 @@ import pytest
 
 from gyver.attrs import define, info, mark_factory
 
+from gyver.attrs.methods import MethodBuilder
+
+from gyver.attrs.helpers import call_init
+
 
 @define
 class Person:
@@ -409,3 +413,34 @@ def test_defines_correctly_classes_with_non_types_as_hints():
         root: pathlib.Path
         look_on: typing.Optional[pathlib.Path] = None
         exclude: typing.Sequence[typing.Union[str, pathlib.Path]] = ()
+
+
+def test_init_false_does_not_add_attribute_to_init():
+    @define(frozen=False)
+    class Whatever:
+        name: str
+        email: str = info(init=False)
+
+    whatever = Whatever("hello")
+
+    with pytest.raises(AttributeError):
+        assert whatever.email
+
+    assert "email" not in typing.get_type_hints(Whatever.__init__)
+
+    whatever.email = "world"
+    assert whatever.email == "world"
+
+
+def test_define_init_does_not_add_init_function():
+    @define(init=False, frozen=False)
+    class Whatever:
+        name: str
+
+    assert Whatever.__init__ is object.__init__
+    assert hasattr(Whatever, MethodBuilder.make_gattrs_name("__init__"))
+
+    whatever = Whatever()
+    call_init(whatever, name="Hello")
+
+    assert whatever.name == "Hello"

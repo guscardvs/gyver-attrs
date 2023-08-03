@@ -63,8 +63,12 @@ class MethodBuilder:
     def prepare_method_name(self, cls: type):
         method_name = self.method_name
         if implements(cls, method_name):
-            method_name = "_".join(("__gattrs", method_name.lstrip("_")))
+            method_name = self.make_gattrs_name(method_name)
         return method_name
+
+    @staticmethod
+    def make_gattrs_name(method_name: str) -> str:
+        return "_".join(("__gattrs", method_name.lstrip("_")))
 
     def build(self, cls: type) -> dict[str, Any]:
         method_name = self.prepare_method_name(cls)
@@ -97,7 +101,9 @@ class MethodBuilder:
             args += f'{", " if args else ""}*, {", ".join(self.funckargs)}'
         method_signature = method_header + args + method_footer
 
-        method_body = "\n    ".join(self.script_lines) if self.script_lines else "pass"
+        method_body = (
+            "\n    ".join(self.script_lines) if self.script_lines else "pass"
+        )
         if method_decorator:
             method_signature = method_decorator + method_signature
 

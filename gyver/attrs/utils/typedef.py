@@ -18,3 +18,4 @@ class Descriptor(typing.Protocol):
 class InitOptions(typing.TypedDict):
     slots: bool
     frozen: bool
+    init: bool

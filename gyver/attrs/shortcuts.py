@@ -2,7 +2,7 @@ import typing
 
 import typing_extensions
 
-from .field import FieldInfo, info
+from .field import Field, FieldInfo, info
 from .main import define
 
 T = typing.TypeVar("T")
@@ -16,6 +16,7 @@ def mutable(
     maybe_cls: None = None,
     /,
     *,
+    init: bool = True,
     kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
@@ -24,6 +25,7 @@ def mutable(
     hash: typing.Optional[bool] = None,
     pydantic: bool = False,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -33,6 +35,7 @@ def mutable(
     maybe_cls: type[T],
     /,
     *,
+    init: bool = True,
     kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
@@ -41,6 +44,7 @@ def mutable(
     hash: typing.Optional[bool] = None,
     pydantic: bool = False,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> type[T]:
     ...
 
@@ -55,6 +59,7 @@ def mutable(
     maybe_cls: OptionalTypeT[T] = None,
     /,
     *,
+    init: bool = True,
     kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
@@ -63,10 +68,12 @@ def mutable(
     hash: typing.Optional[bool] = None,
     pydantic: bool = False,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
         frozen=False,
+        init=init,
         kw_only=kw_only,
         slots=slots,
         repr=repr,
@@ -75,6 +82,7 @@ def mutable(
         hash=hash,
         pydantic=pydantic,
         dataclass_fields=dataclass_fields,
+        field_class=field_class,
     )
 
 
@@ -84,6 +92,7 @@ def kw_only(
     /,
     *,
     frozen: bool = False,
+    init: bool = True,
     slots: bool = True,
     repr: bool = True,
     eq: bool = True,
@@ -91,6 +100,7 @@ def kw_only(
     hash: typing.Optional[bool] = None,
     pydantic: bool = False,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -101,6 +111,7 @@ def kw_only(
     /,
     *,
     frozen: bool = False,
+    init: bool = True,
     slots: bool = True,
     repr: bool = True,
     eq: bool = True,
@@ -108,6 +119,7 @@ def kw_only(
     hash: typing.Optional[bool] = None,
     pydantic: bool = False,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> type[T]:
     ...
 
@@ -123,6 +135,7 @@ def kw_only(
     /,
     *,
     frozen: bool = True,
+    init: bool = True,
     slots: bool = True,
     repr: bool = True,
     eq: bool = True,
@@ -130,10 +143,12 @@ def kw_only(
     hash: typing.Optional[bool] = None,
     pydantic: bool = False,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
         frozen=frozen,
+        init=init,
         kw_only=True,
         slots=slots,
         repr=repr,
@@ -142,6 +157,7 @@ def kw_only(
         hash=hash,
         pydantic=pydantic,
         dataclass_fields=dataclass_fields,
+        field_class=field_class,
     )
 
 
@@ -151,6 +167,7 @@ def schema_class(
     /,
     *,
     frozen: bool = False,
+    init: bool = True,
     kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
@@ -158,6 +175,7 @@ def schema_class(
     order: bool = True,
     hash: typing.Optional[bool] = None,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -168,6 +186,7 @@ def schema_class(
     /,
     *,
     frozen: bool = False,
+    init: bool = False,
     kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
@@ -175,6 +194,7 @@ def schema_class(
     order: bool = True,
     hash: typing.Optional[bool] = None,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> type[T]:
     ...
 
@@ -190,6 +210,7 @@ def schema_class(
     /,
     *,
     frozen: bool = True,
+    init: bool = True,
     kw_only: bool = False,
     slots: bool = True,
     repr: bool = True,
@@ -197,10 +218,12 @@ def schema_class(
     order: bool = True,
     hash: typing.Optional[bool] = None,
     dataclass_fields: bool = False,
+    field_class: type[Field] = Field,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
         frozen=frozen,
+        init=init,
         kw_only=kw_only,
         slots=slots,
         repr=repr,
@@ -209,4 +232,5 @@ def schema_class(
         hash=hash,
         pydantic=True,
         dataclass_fields=dataclass_fields,
+        field_class=field_class,
     )

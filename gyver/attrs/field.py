@@ -15,6 +15,7 @@ class Field:
         "alias",
         "eq",
         "order",
+        "init",
         "inherited",
     )
 
@@ -27,6 +28,7 @@ class Field:
         alias: str,
         eq: Union[bool, Callable[[Any], Any]],
         order: Union[bool, Callable[[Any], Any]],
+        init: bool,
         inherited: bool = False,
     ) -> None:
         self.name = name
@@ -36,6 +38,7 @@ class Field:
         self.alias = alias
         self.eq = eq
         self.order = order
+        self.init = init
         self.inherited = inherited
 
     @property
@@ -64,7 +67,9 @@ class Field:
 
     @property
     def has_default(self) -> bool:
-        return self.default is not MISSING and not is_factory_marked(self.default)
+        return self.default is not MISSING and not is_factory_marked(
+            self.default
+        )
 
     @property
     def has_default_factory(self) -> bool:
@@ -88,6 +93,7 @@ class Field:
                     f"alias={self.alias}",
                     f"eq={self.eq}",
                     f"order={self.order}",
+                    f"init={self.init}",
                     f"inherited={self.inherited}",
                 )
             )
@@ -105,7 +111,14 @@ class Field:
 
 
 class FieldInfo:
-    __slots__ = ("default", "kw_only", "alias", "eq", "order")
+    __slots__ = (
+        "default",
+        "kw_only",
+        "alias",
+        "eq",
+        "order",
+        "init",
+    )
 
     def __init__(
         self,
@@ -114,12 +127,14 @@ class FieldInfo:
         kw_only: bool,
         eq: Union[bool, Callable[[Any], Any]],
         order: Union[bool, Callable[[Any], Any]],
+        init: bool,
     ) -> None:
         self.default = default
         self.kw_only = kw_only
         self.alias = alias
         self.eq = eq
         self.order = order
+        self.init = init
 
     def asdict(self):
         return {key: getattr(self, key) for key in self.__slots__}
@@ -139,6 +154,7 @@ def info(
     kw_only: bool = False,
     eq: Union[bool, Callable[[Any], Any]] = True,
     order: Union[bool, Callable[[Any], Any]] = True,
+    init: bool = True,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     ...
 
@@ -151,6 +167,7 @@ def info(
     kw_only: bool = False,
     eq: Union[bool, Callable[[Any], Any]] = True,
     order: Union[bool, Callable[[Any], Any]] = True,
+    init: bool = True,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     ...
 
@@ -162,6 +179,7 @@ def info(
     kw_only: bool = False,
     eq: Union[bool, Callable[[Any], Any]] = True,
     order: Union[bool, Callable[[Any], Any]] = True,
+    init: bool = True,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     ...
 
@@ -174,6 +192,7 @@ def info(
     kw_only: bool = False,
     eq: Union[bool, Callable[[Any], Any]] = True,
     order: Union[bool, Callable[[Any], Any]] = True,
+    init: bool = True,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     """
     Declare metadata for a gyver-attrs field.
@@ -198,6 +217,7 @@ def info(
         kw_only,
         eq,
         order,
+        init,
     )
 
 
