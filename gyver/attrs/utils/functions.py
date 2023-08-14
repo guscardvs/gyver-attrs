@@ -1,5 +1,5 @@
 import re
-from typing import Any, TypeVar, get_args, get_origin
+from typing import Any, Callable, TypeVar, Union, get_args, get_origin
 
 from .typedef import DisassembledType
 
@@ -39,13 +39,31 @@ def indent(string: str, *, skip_line: bool = False) -> str:
 _sentinel = object()
 
 
+def stamp_func(item: Union[Callable, classmethod, staticmethod]):
+    to_stamp = item
+    if isinstance(item, (classmethod, staticmethod)):
+        to_stamp = item.__func__
+    setattr(to_stamp, "__gattrs_func__", True)
+
+
 def implements(cls: type, name: str):
     attr = getattr(cls, name, _sentinel)
     if attr is _sentinel:
         return False
 
+    if hasattr(attr, "__gattrs_func__"):
+        return False
+
+    if func := getattr(attr, "__func__", None):
+        if hasattr(func, "__gattrs_func__"):
+            return False
+
     return next(
-        (False for base_cls in cls.mro()[1:] if getattr(base_cls, name, None) is attr),
+        (
+            False
+            for base_cls in cls.mro()[1:]
+            if getattr(base_cls, name, None) is attr
+        ),
         True,
     )
 
@@ -54,7 +72,9 @@ _to_camel_regex = re.compile("_([a-zA-Z])")
 
 
 def to_camel(string: str) -> str:
-    return _to_camel_regex.sub(lambda match: match[1].upper(), string.strip("_"))
+    return _to_camel_regex.sub(
+        lambda match: match[1].upper(), string.strip("_")
+    )
 
 
 def to_upper_camel(string: str) -> str:

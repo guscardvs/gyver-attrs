@@ -5,7 +5,7 @@ from typing import Any, Mapping, Optional, Union
 
 from typing_extensions import Self
 
-from gyver.attrs.utils.functions import implements
+from gyver.attrs.utils.functions import implements, stamp_func
 
 EllipsisType = type(...)
 
@@ -82,6 +82,7 @@ class MethodBuilder:
             self.globs,
         )
         func.__annotations__ = method_annotations
+        stamp_func(func)
         return {method_name: func}
 
     def _make_methodstr(self, method_name: str):

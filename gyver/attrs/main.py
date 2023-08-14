@@ -121,7 +121,11 @@ def define(
         clsdict = (
             _get_clsdict(cls, field_map)
             | _get_cls_metadata(cls)
-            | _get_init(cls, field_map, {"frozen": frozen, "slots": slots, "init": init})
+            | _get_init(
+                cls,
+                field_map,
+                {"frozen": frozen, "slots": slots, "init": init},
+            )
             | _get_parse_dict(cls, field_map)
             | _get_gserialize(cls, field_map)
         )
