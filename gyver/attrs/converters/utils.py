@@ -6,7 +6,6 @@ T = TypeVar("T")
 try:
     from gattrs_converter import deserialize, deserialize_mapping, make_mapping
 
-    raise ImportError
 except ImportError:
 
     def make_mapping(obj: Any, by_alias: bool = False) -> Mapping[str, Any]:
