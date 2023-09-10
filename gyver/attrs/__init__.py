@@ -24,5 +24,5 @@ __all__ = [
     "UNINITIALIZED",
 ]
 
-__version__ = "0.5.4"
+__version__ = "0.6.0"
 __version_info__ = tuple(map(int, __version__.split(".")))

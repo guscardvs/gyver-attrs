@@ -1,8 +1,8 @@
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.5.4"
 tag_format = "$version"
-version_files = [
-    "pyproject.toml:version",
-    "gyver/attrs/__init__.py:__version__"
-]
+version_scheme = "pep440"
+version_provider = "poetry"
+update_changelog_on_bump = true
+major_version_zero = true
+version_files = ["gyver/attrs/__init__.py:__version__"]
