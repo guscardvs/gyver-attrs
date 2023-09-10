@@ -1,5 +1,6 @@
+from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, Sequence, TypeVar, cast
 
 from typing_extensions import Concatenate, ParamSpec
 
@@ -37,3 +38,29 @@ def call_init(self: Any, *args, **kwargs) -> None:
         getattr(self, "__gattrs_init__", getattr(self, "__init__")),
     )
     return init(*args, **kwargs)
+
+
+CallbackSequence = Sequence[Callable[[T], Any]]
+
+
+def null_callable():
+    pass
+
+
+@contextmanager
+@validate_type
+def init_hooks(
+    self: T,
+    pre_callbacks: CallbackSequence[T] = (),
+    post_callbacks: CallbackSequence[T] = (),
+):
+    pre_init = getattr(self, "__pre_init__", null_callable)
+    post_init = getattr(self, "__post_init__", null_callable)
+
+    for call in pre_callbacks:
+        call(self)
+    pre_init()
+    yield
+    for call in post_callbacks:
+        call(self)
+    post_init()

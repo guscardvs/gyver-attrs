@@ -1,7 +1,7 @@
 import re
 from typing import Any, Callable, TypeVar, Union, get_args, get_origin
 
-from .typedef import DisassembledType
+from .typedef import UNINITIALIZED, DisassembledType
 
 T = TypeVar("T")
 
@@ -11,6 +11,8 @@ def disassemble_type(typ: type) -> DisassembledType:
 
 
 def frozen_setattr(self, name: str, value: Any):
+    if getattr(self, name, UNINITIALIZED) is UNINITIALIZED:
+        return object.__setattr__(self, name, value)
     del value
     raise AttributeError(
         f"Class {type(self)} is frozen, and attribute {name} cannot be set"
@@ -57,24 +59,14 @@ def implements(cls: type, name: str):
     if func := getattr(attr, "__func__", None):
         if hasattr(func, "__gattrs_func__"):
             return False
-
-    return next(
-        (
-            False
-            for base_cls in cls.mro()[1:]
-            if getattr(base_cls, name, None) is attr
-        ),
-        True,
-    )
+    return all(getattr(base_cls, name, None) is not attr for base_cls in cls.mro()[1:])
 
 
 _to_camel_regex = re.compile("_([a-zA-Z])")
 
 
 def to_camel(string: str) -> str:
-    return _to_camel_regex.sub(
-        lambda match: match[1].upper(), string.strip("_")
-    )
+    return _to_camel_regex.sub(lambda match: match[1].upper(), string.strip("_"))
 
 
 def to_upper_camel(string: str) -> str:

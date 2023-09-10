@@ -83,7 +83,13 @@ class FieldsBuilder:
         return self
 
     def _info_from_dc(self, field: dataclasses.Field) -> FieldInfo:
-        kwargs = {}
+        kwargs: dict = default_info.asdict() | {
+            "init": field.init,
+            "hash": field.hash,
+            "eq": field.compare,
+            "order": field.compare,
+            "repr": field.repr,
+        }
         if field.default_factory is not dataclasses.MISSING:
             kwargs["default"] = (
                 field.default_factory
@@ -94,10 +100,9 @@ class FieldsBuilder:
             kwargs["default"] = field.default
         else:
             kwargs["default"] = MISSING
-        if not field.init:
-            raise TypeError("Unable to handle non init fields")
-        if not field.compare:
-            kwargs["eq"] = kwargs["order"] = False
+        # python 3.10+ support
+        if kw_only := getattr(field, "kw_only", default_info.kw_only):
+            kwargs["kw_only"] = kw_only
         return FieldInfo(**kwargs)
 
 

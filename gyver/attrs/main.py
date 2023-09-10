@@ -7,17 +7,13 @@ from enum import Enum
 import typing_extensions
 
 from gyver.attrs import schema
-from gyver.attrs.converters.utils import (
-    deserialize,
-    deserialize_mapping,
-    fromdict,
-)
+from gyver.attrs.converters.utils import deserialize, deserialize_mapping, fromdict
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
 from gyver.attrs.utils.functions import frozen as freeze
 from gyver.attrs.utils.functions import indent
-from gyver.attrs.utils.typedef import MISSING, Descriptor, InitOptions
+from gyver.attrs.utils.typedef import MISSING, UNINITIALIZED, Descriptor, InitOptions
 
 T = typing.TypeVar("T")
 
@@ -92,14 +88,13 @@ def define(
     :param maybe_cls: Optional[type[T]], a type argument that needs to be
     wrapped in the FieldsBuilder.
     :param frozen: bool, whether to create an immutable class or not.
-    :param kw_only: bool, whether to include keyword-only parameters in the
-    constructor or not.
+    :param kw_only: bool, whether all params should be kw_only or not.
     :param slots: bool, whether to generate a class using __slots__ or not.
     :param repr: bool, whether to generate a __repr__ method or not.
     :param eq: bool, whether to generate an __eq__ method or not.
     :param order: bool, whether to generate rich comparison methods or not.
-    :param hash: Optional[bool], whether to generate a __hash__ method or not.
-    :param pydantic: Optional[bool], whether to generate a __get_validator__ method or
+    :param hash: bool, whether to generate a __hash__ method or not.
+    :param pydantic: bool, whether to generate a __get_validator__ method or
     not to facilitate integration with pydantic.
     :param dataclass_fields: bool, whether to add __dataclass_fields__ with the
     dataclass format. This way, the class becomes a drop-in replacement for dataclasses.
@@ -171,17 +166,14 @@ def _get_slots_metadata(
     inherited_slots: dict[str, typing.Any] = {}
     for base_cls in cls.mro()[1:-1]:
         inherited_slots |= {
-            name: getattr(base_cls, name)
-            for name in getattr(base_cls, "__slots__", ())
+            name: getattr(base_cls, name) for name in getattr(base_cls, "__slots__", ())
         }
     reused_slots = {
         slot: descriptor
         for slot, descriptor in inherited_slots.items()
         if slot in field_map
     }
-    slot_names = tuple(
-        field for field in field_map if field not in reused_slots
-    )
+    slot_names = tuple(field for field in field_map if field not in reused_slots)
     for value in cls.__dict__.values():
         if _is_descriptor_type(value):
             slot_names += (value.private_name,)
@@ -201,9 +193,7 @@ def _get_cls_metadata(cls: type):
 def _make_setattr(frozen: bool):
     def _setattr(field: str, arg: typing.Any):
         return (
-            f"_setattr(self, '{field}', {arg})"
-            if frozen
-            else f"self.{field} = {arg}"
+            f"_setattr(self, '{field}', {arg})" if frozen else f"self.{field} = {arg}"
         )
 
     return _setattr
@@ -219,6 +209,7 @@ def _get_init(cls: type, field_map: FieldMap, opts: InitOptions):
             "attr_dict": field_map,
             "MISSING": MISSING,
             "_setattr": object.__setattr__,
+            "UNINITIALIZED": UNINITIALIZED,
         },
     )
     _setattr = _make_setattr(opts["frozen"])
@@ -227,10 +218,20 @@ def _get_init(cls: type, field_map: FieldMap, opts: InitOptions):
     if not opts["slots"]:
         builder.add_scriptline("_inst_dict = self.__dict__")
     for field in field_map.values():
-        if not field.init:
-            continue
         field_name = field.name
         arg_name = field.alias.lstrip("_")
+        if not field.init:
+            if field.has_default:
+                builder.add_scriptline(
+                    _setattr(field_name, f"attr_dict['{field_name}'].default")
+                )
+            elif field.has_default_factory:
+                factory_name = f"__attr_factory_{field_name}"
+                builder.add_scriptline(_setattr(field_name, f"{factory_name}()"))
+                builder.add_glob(factory_name, field.default)
+            else:
+                builder.add_scriptline(_setattr(field_name, "UNINITIALIZED"))
+            continue
         if field.has_default:
             arg = f"{arg_name}=attr_dict['{field_name}'].default"
 
@@ -261,14 +262,21 @@ def _get_init(cls: type, field_map: FieldMap, opts: InitOptions):
 
 
 def _get_repr(cls: type, field_map: FieldMap):
-    fieldstr = ", ".join(
-        f"{field.name}={{self.{field.name}!r}}" for field in field_map.values()
-    )
+    fields = []
+    globs = {}
+    for field in field_map.values():
+        if field.repr is False:
+            continue
+        elif field.repr is True:
+            fields.append(f"{field.name}={{self.{field.name}!r}}")
+        else:
+            field_repr_call = f"__repr_{field.name}"
+            globs[field_repr_call] = field.repr
+            fields.append(f"{field.name}={{{field_repr_call}(self.{field.name})!r}}")
+    fieldstr = ", ".join(fields)
     returnline = f"return f'{cls.__name__}({fieldstr})'"
     return (
-        MethodBuilder(
-            "__repr__",
-        )
+        MethodBuilder("__repr__", globs)
         .add_annotation("return", str)
         .add_scriptline(returnline)
         .build(cls)
@@ -280,9 +288,7 @@ _othername = "other"
 
 def _get_eq(cls: type, field_map: FieldMap):
     fields_to_compare = {
-        name: field
-        for name, field in field_map.items()
-        if field.eq is not False
+        name: field for name, field in field_map.items() if field.eq is not False
     }
     builder = MethodBuilder("__eq__").add_funcarg(_othername)
     if fields_to_compare:
@@ -328,10 +334,7 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
     builder = (
         MethodBuilder(
             "__parse_dict__",
-            {
-                "deserialize": deserialize,
-                "deserialize_mapping": deserialize_mapping,
-            },
+            {"deserialize": deserialize, "deserialize_mapping": deserialize_mapping},
         )
         .add_funcarg("alias")
         .add_annotation("alias", bool)
@@ -339,13 +342,15 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
     )
     for name, field in field_map.items():
         field_type = field.origin or field.declared_type
-        if isinstance(field_type, str):
+        if isinstance(field_type, str) and not field.asdict_:
             raise NotImplementedError(
-                "For now gyver-attrs cannot deal correctly"
-                " with forward references"
+                ("For now gyver-attrs cannot deal correctly" " with forward references")
             )
         builder.add_glob(f"field_type_{field.name}", field_type)
-        if hasattr(field_type, "__parse_dict__"):
+        if field.asdict_:
+            builder.add_glob(f"_asdict_{field.name}", field.asdict_)
+            arg = f"'{{name}}': _asdict_{field.name}(self.{name})"
+        elif hasattr(field_type, "__parse_dict__"):
             arg = f"'{{name}}': self.{name}.__parse_dict__(alias)"
         elif not isinstance(field_type, type):
             arg = f"'{{name}}': self.{name}"
@@ -436,20 +441,22 @@ def _get_gserialize(cls: type, field_map: FieldMap):
         field_type = field.origin or field.declared_type
         builder.add_glob(f"_field_type_{field.name}", field_type)
         get_line = (
-            f"dict_get(mapping, {field.name!r}, {field.alias!r},"
-            "sentinel, _dict_get)"
+            f"dict_get(mapping, {field.name!r}, {field.alias!r}," "sentinel, _dict_get)"
         )
-        if hasattr(field_type, "__gserialize__"):
+        if field.fromdict:
+            builder.add_glob(f"_field_type_{field.name}", field.fromdict)
+            arg = f"_field_type_{field.name}({get_line})"
+        elif hasattr(field_type, "__gserialize__"):
             arg = f"_field_type_{field.name}.__gserialize__({get_line})"
         elif field_type in (date, datetime):
-            arg = f"_field_type_{field.name}.fromisoformat" f"({get_line})"
+            arg = f"_field_type_{field.name}.fromisoformat({get_line})"
         elif not isinstance(field_type, type):
             arg = f"({get_line})"
         elif issubclass(field_type, (list, tuple, set, dict)):
             arg, globs = _get_gserialize_sequence_arg(field)
             builder.merge_globs(globs)
         else:
-            arg = f"({get_line})"
+            arg = f"_field_type_{field.name}({get_line})"
         args.append(f"{field.alias}={arg}")
     builder.add_scriptline(f"return cls({', '.join(args)})")
     return builder.build(cls)
@@ -461,8 +468,7 @@ def _get_gserialize_sequence_arg(
     field_type = field.origin or field.declared_type
     globs = {}
     default_line = (
-        f"dict_get(mapping, {field.name!r}, {field.alias!r},"
-        "sentinel, _dict_get)"
+        f"dict_get(mapping, {field.name!r}, {field.alias!r}," "sentinel, _dict_get)"
     )
 
     returnline = default_line
@@ -581,9 +587,15 @@ def _get_hash(cls: type, fields_map: FieldMap, wants_hash: bool):
     builder = MethodBuilder("__hash__")
     args = ["type(self)"]
     for field in fields_map.values():
+        if not field.hash:
+            continue
         arg = f"self.{field.name}"
         field_type = field.origin or field.declared_type
-        if not isinstance(field.eq, bool):
+        if field.hash is not True:
+            glob = f"_hash_{field.name}"
+            arg = f"{glob}({arg})"
+            builder.add_glob(glob, field.hash)
+        elif not isinstance(field.eq, bool):
             glob = f"_hash_{field.name}"
             arg = f"{glob}({arg})"
             builder.add_glob(glob, field.eq)
@@ -591,9 +603,16 @@ def _get_hash(cls: type, fields_map: FieldMap, wants_hash: bool):
             pass  # Do not handle aliases and annotations
         elif not issubclass(field_type, typing.Hashable):
             if not wants_hash:
-                return {}
+                continue
             raise TypeError("field type is not hashable", field.name, cls)
         args.append(arg)
+
+    # if it only contains the class and no field qualifies for hashing
+    if len(args) == 1:
+        if not wants_hash:
+            return {}
+        raise TypeError("No hashable field found for class")
+
     return (
         builder.add_scriptline(f"return hash(({', '.join(args)}))")
         .add_annotation("return", int)
@@ -605,12 +624,12 @@ def _get_pydantic_handlers(cls: type, fields_map: FieldMap):
     namespace = {}
 
     # Create Validation Function
-    builder = MethodBuilder(
-        "__pydantic_validate__", {"fromdict": fromdict}
-    ).set_type(MethodType.CLASS)
-    builder.add_funcarg("value").add_annotation(
-        "value", typing.Any
-    ).add_annotation("return", cls)
+    builder = MethodBuilder("__pydantic_validate__", {"fromdict": fromdict}).set_type(
+        MethodType.CLASS
+    )
+    builder.add_funcarg("value").add_annotation("value", typing.Any).add_annotation(
+        "return", cls
+    )
     builder.add_scriptlines(
         "if isinstance(value, cls):",
         indent("return value"),
@@ -639,7 +658,6 @@ def _get_pydantic_handlers(cls: type, fields_map: FieldMap):
         .add_funcarg("field_schema")
     )
 
-    ("field_schema.update({'type': \"object\"})")
     cls_schema = schema.Schema(
         cls.__name__,
         "object",
@@ -657,9 +675,7 @@ def _generate_schema_lines(fields_map: FieldMap) -> dict[str, schema.HasStr]:
     for field in fields_map.values():
         field_type = field.field_type
         if current_map := getattr(field_type, "__gyver_attrs__", None):
-            required = [
-                f.argname for f in current_map.values() if f.default is MISSING
-            ]
+            required = [f.argname for f in current_map.values() if f.default is MISSING]
             schemas[field.argname] = schema.Schema(
                 field_type.__name__,
                 "object",
@@ -667,9 +683,7 @@ def _generate_schema_lines(fields_map: FieldMap) -> dict[str, schema.HasStr]:
                 properties=_generate_schema_lines(current_map),
             )
         else:
-            schemas[field.argname] = _resolve_schematype(
-                field.field_type, field.args
-            )
+            schemas[field.argname] = _resolve_schematype(field.field_type, field.args)
     return schemas
 
 
@@ -689,10 +703,7 @@ def _resolve_schematype(
         extras = {}
         if args:
             extras["items"] = schema.Items(
-                *(
-                    _resolve_schematype(arg, typing.get_args(arg))
-                    for arg in args
-                )
+                *(_resolve_schematype(arg, typing.get_args(arg)) for arg in args)
             )
         return schema.DictSchema("array", **extras)
     if field_type is dict:
@@ -709,9 +720,7 @@ def _resolve_schematype(
             )
         return schema.DictSchema("object", **extras)
     if current_map := getattr(field_type, "__gyver_attrs__", None):
-        required = [
-            f.argname for f in current_map.values() if f.default is MISSING
-        ]
+        required = [f.argname for f in current_map.values() if f.default is MISSING]
         return schema.Schema(
             field_type.__name__,
             "object",
@@ -719,9 +728,7 @@ def _resolve_schematype(
             properties=_generate_schema_lines(current_map),
         )
     if field_type is typing.Union:
-        choices = [
-            _resolve_schematype(arg, typing.get_args(arg)) for arg in args
-        ]
+        choices = [_resolve_schematype(arg, typing.get_args(arg)) for arg in args]
         return schema.ListSchema("anyOf", *choices)
     if issubclass(field_type, Enum):
         # remove from parents cls, enum.Enum and object
@@ -746,9 +753,7 @@ def _resolve_schematype(
     if issubclass(field_type, time):
         return schema.DictSchema("string", format=schema.str_cast("time"))
     if issubclass(field_type, timedelta):
-        return schema.DictSchema(
-            "number", format=schema.str_cast("time-delta")
-        )
+        return schema.DictSchema("number", format=schema.str_cast("time-delta"))
     raise NotImplementedError
 
 

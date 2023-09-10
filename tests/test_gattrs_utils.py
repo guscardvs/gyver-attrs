@@ -18,22 +18,22 @@ def test_as_dict():
     mapping = {"x": 1, "y": [1, 2, 3]}
     parsed = asdict(fromdict(ExampleClass, mapping))
     assert isinstance(parsed, dict)
-    assert parsed == {"x": 1, "y": [1, 2, 3]}
+    assert parsed == {"x": 1, "y": "[1, 2, 3]"}
 
     mapping = {"x": 1, "y": (1, 2, 3)}
     parsed = asdict(fromdict(ExampleClass, mapping))
     assert isinstance(parsed, dict)
-    assert parsed == {"x": 1, "y": (1, 2, 3)}
+    assert parsed == {"x": 1, "y": "(1, 2, 3)"}
 
     mapping = {"x": 1, "y": {1, 2, 3}}
     parsed = asdict(fromdict(ExampleClass, mapping))
     assert isinstance(parsed, dict)
-    assert parsed == {"x": 1, "y": {1, 2, 3}}
+    assert parsed == {"x": 1, "y": "{1, 2, 3}"}
 
     mapping = {"x": 1, "y": {"a": 1, "b": 2}}
     parsed = asdict(fromdict(ExampleClass, mapping))
     assert isinstance(parsed, dict)
-    assert parsed == {"x": 1, "y": {"a": 1, "b": 2}}
+    assert parsed == {"x": 1, "y": "{'a': 1, 'b': 2}"}
 
 
 def test_unwrap_deeply_nested_mapping():

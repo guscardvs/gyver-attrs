@@ -19,3 +19,7 @@ class InitOptions(typing.TypedDict):
     slots: bool
     frozen: bool
     init: bool
+
+
+class UNINITIALIZED:
+    pass

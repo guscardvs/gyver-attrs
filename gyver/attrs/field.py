@@ -5,6 +5,8 @@ from typing_extensions import Self
 from gyver.attrs.utils.factory import is_factory_marked, mark_factory
 from gyver.attrs.utils.typedef import MISSING, DisassembledType
 
+BoolOrCallable = Union[bool, Callable[[Any], Any]]
+
 
 class Field:
     __slots__ = (
@@ -16,6 +18,10 @@ class Field:
         "eq",
         "order",
         "init",
+        "hash",
+        "repr",
+        "asdict_",
+        "fromdict",
         "inherited",
     )
 
@@ -26,9 +32,13 @@ class Field:
         kw_only: bool,
         default: Any,
         alias: str,
-        eq: Union[bool, Callable[[Any], Any]],
-        order: Union[bool, Callable[[Any], Any]],
+        eq: BoolOrCallable,
+        order: BoolOrCallable,
         init: bool,
+        hash: BoolOrCallable,
+        repr: Union[bool, Callable[[Any], str]],
+        asdict_: Optional[Callable[[Any], Any]],
+        fromdict: Optional[Callable[[Any], Any]],
         inherited: bool = False,
     ) -> None:
         self.name = name
@@ -39,6 +49,10 @@ class Field:
         self.eq = eq
         self.order = order
         self.init = init
+        self.hash = hash
+        self.repr = repr
+        self.asdict_ = asdict_
+        self.fromdict = fromdict
         self.inherited = inherited
 
     @property
@@ -67,9 +81,7 @@ class Field:
 
     @property
     def has_default(self) -> bool:
-        return self.default is not MISSING and not is_factory_marked(
-            self.default
-        )
+        return self.default is not MISSING and not is_factory_marked(self.default)
 
     @property
     def has_default_factory(self) -> bool:
@@ -94,6 +106,9 @@ class Field:
                     f"eq={self.eq}",
                     f"order={self.order}",
                     f"init={self.init}",
+                    f"hash={self.hash}",
+                    f"repr={self.repr}",
+                    f"asdict_={self.asdict_}",
                     f"inherited={self.inherited}",
                 )
             )
@@ -118,6 +133,10 @@ class FieldInfo:
         "eq",
         "order",
         "init",
+        "hash",
+        "repr",
+        "asdict_",
+        "fromdict",
     )
 
     def __init__(
@@ -125,9 +144,13 @@ class FieldInfo:
         default: Any,
         alias: str,
         kw_only: bool,
-        eq: Union[bool, Callable[[Any], Any]],
-        order: Union[bool, Callable[[Any], Any]],
+        eq: BoolOrCallable,
+        order: BoolOrCallable,
         init: bool,
+        hash: BoolOrCallable,
+        repr: Union[bool, Callable[[Any], str]],
+        asdict_: Optional[Callable[[Any], Any]],
+        fromdict: Optional[Callable[[Any], Any]],
     ) -> None:
         self.default = default
         self.kw_only = kw_only
@@ -135,6 +158,10 @@ class FieldInfo:
         self.eq = eq
         self.order = order
         self.init = init
+        self.hash = hash
+        self.repr = repr
+        self.asdict_ = asdict_
+        self.fromdict = fromdict
 
     def asdict(self):
         return {key: getattr(self, key) for key in self.__slots__}
@@ -152,9 +179,13 @@ def info(
     default_factory: Callable[[], Any],
     alias: str = "",
     kw_only: bool = False,
-    eq: Union[bool, Callable[[Any], Any]] = True,
-    order: Union[bool, Callable[[Any], Any]] = True,
+    eq: BoolOrCallable = True,
+    order: BoolOrCallable = True,
     init: bool = True,
+    hash: BoolOrCallable = True,
+    repr: Union[bool, Callable[[Any], str]] = True,
+    asdict: Optional[Callable[[Any], Any]] = None,
+    fromdict: Optional[Callable[[Any], Any]] = None,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     ...
 
@@ -165,9 +196,13 @@ def info(
     default: Any,
     alias: str = "",
     kw_only: bool = False,
-    eq: Union[bool, Callable[[Any], Any]] = True,
-    order: Union[bool, Callable[[Any], Any]] = True,
+    eq: BoolOrCallable = True,
+    order: BoolOrCallable = True,
     init: bool = True,
+    hash: BoolOrCallable = True,
+    repr: Union[bool, Callable[[Any], str]] = True,
+    asdict: Optional[Callable[[Any], Any]] = None,
+    fromdict: Optional[Callable[[Any], Any]] = None,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     ...
 
@@ -177,9 +212,13 @@ def info(
     *,
     alias: str = "",
     kw_only: bool = False,
-    eq: Union[bool, Callable[[Any], Any]] = True,
-    order: Union[bool, Callable[[Any], Any]] = True,
+    eq: BoolOrCallable = True,
+    order: BoolOrCallable = True,
     init: bool = True,
+    hash: BoolOrCallable = True,
+    repr: Union[bool, Callable[[Any], str]] = True,
+    asdict: Optional[Callable[[Any], Any]] = None,
+    fromdict: Optional[Callable[[Any], Any]] = None,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     ...
 
@@ -190,9 +229,13 @@ def info(
     default_factory: Callable[[], Any] = ...,
     alias: str = "",
     kw_only: bool = False,
-    eq: Union[bool, Callable[[Any], Any]] = True,
-    order: Union[bool, Callable[[Any], Any]] = True,
+    eq: BoolOrCallable = True,
+    order: BoolOrCallable = True,
     init: bool = True,
+    hash: BoolOrCallable = True,
+    repr: Union[bool, Callable[[Any], str]] = True,
+    asdict: Optional[Callable[[Any], Any]] = None,
+    fromdict: Optional[Callable[[Any], Any]] = None,
 ) -> Any:  # sourcery skip: instance-method-first-arg-name
     """
     Declare metadata for a gyver-attrs field.
@@ -218,7 +261,11 @@ def info(
         eq,
         order,
         init,
+        hash,
+        repr,
+        asdict,
+        fromdict,
     )
 
 
-default_info = info()
+default_info: FieldInfo = info()

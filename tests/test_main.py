@@ -1,14 +1,13 @@
 import pathlib
 import typing
+from dataclasses import field
 from unittest.mock import Mock
 
 import pytest
 
-from gyver.attrs import define, info, mark_factory
-
+from gyver.attrs import UNINITIALIZED, define, info, mark_factory
+from gyver.attrs.helpers import call_init, init_hooks
 from gyver.attrs.methods import MethodBuilder
-
-from gyver.attrs.helpers import call_init
 
 
 @define
@@ -54,12 +53,14 @@ def test_repr_returns_the_expected_string():
     @define
     class Another:
         email: str
+        name: str = info(repr=str.title)
+        password: str = info(repr=False)
 
     person = Person("Jane Doe", 30)
-    another = Another("test@example.com")
+    another = Another("test@example.com", "valerica", "Very Important Secret")
 
     assert repr(person) == "Person(name='Jane Doe', age=30)"
-    assert repr(another) == "Another(email='test@example.com')"
+    assert repr(another) == "Another(email='test@example.com', name='Valerica')"
 
 
 def test_defaults_work_as_expected():
@@ -296,6 +297,15 @@ def test_define_creates_hashable_classes():
     class B:
         x: int = info(eq=lambda val: val % 3)
 
+    @define
+    class C:
+        x: int = info(hash=lambda val: val * 3)
+        y: int = info(hash=False)
+
+    @define
+    class D:
+        x: int = info(hash=lambda val: val / 3, eq=lambda val: val * 3)
+
     sentinel = object()
 
     assert isinstance(A(1), typing.Hashable)
@@ -303,6 +313,8 @@ def test_define_creates_hashable_classes():
     assert hash(A(2)) != hash(A(1)) == hash(A(1))
     assert hash(B(3)) == hash(B(6)) != hash(B(7))
     assert A(1) is not A(2)
+    assert hash(C(3, 2)) == hash(C(3, 1))
+    assert hash(D(3)) == hash((D, 3 / 3))
 
 
 def test_define_does_not_create_hashable_when_it_shouldnt():
@@ -415,21 +427,27 @@ def test_defines_correctly_classes_with_non_types_as_hints():
         exclude: typing.Sequence[typing.Union[str, pathlib.Path]] = ()
 
 
-def test_init_false_does_not_add_attribute_to_init():
-    @define(frozen=False)
+def test_init_false_does_sets_values_with_proper_initial_values():
+    @define
     class Whatever:
         name: str
         email: str = info(init=False)
+        age: int = info(init=False, default=18)
+        friend: list[str] = info(init=False, default_factory=list)
 
     whatever = Whatever("hello")
 
-    with pytest.raises(AttributeError):
-        assert whatever.email
+    assert whatever.email is UNINITIALIZED
+    assert whatever.age == 18
+    assert whatever.friend == []
 
     assert "email" not in typing.get_type_hints(Whatever.__init__)
 
     whatever.email = "world"
     assert whatever.email == "world"
+
+    with pytest.raises(AttributeError):
+        whatever.email = "Hello"
 
 
 def test_define_init_does_not_add_init_function():
@@ -444,3 +462,88 @@ def test_define_init_does_not_add_init_function():
     call_init(whatever, name="Hello")
 
     assert whatever.name == "Hello"
+
+
+def test_init_hooks():
+    @define(init=False, frozen=False)
+    class TestObject:
+        pre_init_called: bool = info(init=False)
+        post_init_called: bool = info(init=False)
+
+        def __pre_init__(self):
+            self.pre_init_called = True
+
+        def __post_init__(self):
+            self.post_init_called = True
+
+    pre_callback_called = False
+    post_callback_called = False
+
+    def pre_callback(obj):
+        nonlocal pre_callback_called
+        pre_callback_called = True
+
+    def post_callback(obj):
+        nonlocal post_callback_called
+        post_callback_called = True
+
+    obj = TestObject()
+
+    with init_hooks(
+        obj,
+        pre_callbacks=[pre_callback],
+        post_callbacks=[post_callback],
+    ):
+        assert hasattr(obj, "pre_init_called")  # pre-init should be called
+        assert not hasattr(obj, "post_init_called")  # post-init should not be called
+        assert pre_callback_called is True  # Pre-callback should be called
+        assert post_callback_called is False  # Post-callback should not be called
+
+    assert hasattr(
+        obj, "post_init_called"
+    )  # post-init should be called after the context
+
+    pre_callback_called = False
+    post_callback_called = False
+
+    del obj.post_init_called, obj.pre_init_called
+
+    with init_hooks(obj):
+        assert hasattr(obj, "pre_init_called")  # pre-init should be called
+        assert not hasattr(obj, "post_init_called")  # post-init should not be called
+
+    assert hasattr(
+        obj, "post_init_called"
+    )  # post-init should be called after the context
+
+
+def test_init_hooks_ignores_hooks_if_hooks_dont_exist():
+    @define
+    class Test:
+        pass
+
+    obj = Test()
+
+    with init_hooks(obj):
+        pass  # no exceptions should be raised
+
+
+def test_define_is_drop_in_replacement_for_dataclass():
+    @define(frozen=False, dataclass_fields=True)
+    class Test:
+        order_field: int
+        name: str = field(init=False)
+        email: str = field(hash=False)
+        age: int = field(compare=False)
+        password: str = field(default="MyPassword")
+        friends: list[str] = field(default_factory=list)
+
+    default_obj = Test(1, email="Hello", age=18)
+    another = Test(0, email="World", age=19)
+
+    assert default_obj.name is UNINITIALIZED
+    assert default_obj.email == "Hello"
+    assert default_obj.password == "MyPassword"
+    assert default_obj.friends == []
+
+    assert sorted([default_obj, another]) == [another, default_obj]
