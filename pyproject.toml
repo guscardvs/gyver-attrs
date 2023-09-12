@@ -8,9 +8,10 @@ packages = [{ include = "gyver" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-typing-extensions = "^4.5.0"
+typing-extensions = "^4.7.1"
 orjson = { version = "^3.8.6" }
 gyver-attrs-converter = { version = "^0.4.2" }
+lazy-fields = "^1.0.0"
 
 
 [tool.poetry.group.lint.dependencies]

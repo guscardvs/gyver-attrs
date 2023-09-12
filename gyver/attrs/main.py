@@ -1,4 +1,5 @@
 import dataclasses
+import sys
 import typing
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
@@ -11,6 +12,7 @@ from gyver.attrs.converters.utils import deserialize, deserialize_mapping, fromd
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
+from gyver.attrs.utils.functions import disassemble_type
 from gyver.attrs.utils.functions import frozen as freeze
 from gyver.attrs.utils.functions import indent
 from gyver.attrs.utils.typedef import MISSING, UNINITIALIZED, Descriptor, InitOptions
@@ -327,6 +329,16 @@ def _build_field_comparison(
     return builder.add_annotation("return", bool).build(cls)
 
 
+def make_unresolved_ref(cls: type, field: Field):
+    def _unresolved_ref(val: typing.Any) -> typing.NoReturn:
+        raise TypeError(
+            "Trying to use class with unresolved ForwardRef for"
+            f" {cls.__qualname__}.{field.name}",
+        )
+
+    return _unresolved_ref
+
+
 def _get_parse_dict(cls: type, field_map: FieldMap):
     namespace = {}
     args = []
@@ -340,24 +352,15 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
         .add_annotation("alias", bool)
         .add_annotation("return", typing.Mapping[str, typing.Any])
     )
+    mod_globalns = sys.modules[cls.__module__].__dict__
     for name, field in field_map.items():
         field_type = field.origin or field.declared_type
-        if isinstance(field_type, str) and not field.asdict_:
-            raise NotImplementedError(
-                ("For now gyver-attrs cannot deal correctly" " with forward references")
-            )
-        builder.add_glob(f"field_type_{field.name}", field_type)
-        if field.asdict_:
-            builder.add_glob(f"_asdict_{field.name}", field.asdict_)
+        result, resolved = _resolve_forward_ref(field_type, cls, field, mod_globalns)
+        if not resolved:
+            builder.add_glob(f"_asdict_{field.name}", result)
             arg = f"'{{name}}': _asdict_{field.name}(self.{name})"
-        elif hasattr(field_type, "__parse_dict__"):
-            arg = f"'{{name}}': self.{name}.__parse_dict__(alias)"
-        elif not isinstance(field_type, type):
-            arg = f"'{{name}}': self.{name}"
-        elif issubclass(field_type, (list, tuple, set, dict)):
-            arg = _get_parse_dict_sequence_arg(field)
         else:
-            arg = f"'{{name}}': self.{name}"
+            arg = _create_argument_for_field(field, field_type, builder.add_glob)
         args.append(arg.format(name=name))
         alias_args.append(arg.format(name=field.alias))
     builder.add_scriptline(
@@ -374,6 +377,40 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
     builder = MethodBuilder("__iter__", {"todict": deserialize})
     builder.add_scriptline("yield from todict(self).items()")
     return namespace | builder.build(cls)
+
+
+def _resolve_forward_ref(
+    field_type: typing.Any, cls: type, field: Field, mod_globalns: dict[str, typing.Any]
+) -> tuple[typing.Any, bool]:
+    if not isinstance(field_type, typing.ForwardRef) or field.asdict_:
+        return field_type, True
+    try:
+        parsed = field_type._evaluate(mod_globalns, {cls.__name__: cls}, frozenset())
+    except NameError:
+        return make_unresolved_ref(cls, field), False
+    return (
+        (disassemble_type(parsed), True)
+        if parsed is not None
+        else (
+            make_unresolved_ref(cls, field),
+            False,
+        )
+    )
+
+
+def _create_argument_for_field(field, field_type, add_glob):
+    if field.asdict_:
+        add_glob(f"_asdict_{field.name}", field.asdict_)
+        return f"'{{name}}': _asdict_{field.name}(self.{field.name})"
+    elif hasattr(field_type, "__parse_dict__"):
+        return f"'{{name}}': self.{field.name}.__parse_dict__(alias)"
+    elif not isinstance(field_type, type):
+        return f"'{{name}}': self.{field.name}"
+    elif issubclass(field_type, (list, tuple, set, dict)):
+        add_glob(f"field_type_{field.name}", field_type)
+        return _get_parse_dict_sequence_arg(field)
+    else:
+        return f"'{{name}}': self.{field.name}"
 
 
 def _get_parse_dict_sequence_arg(field: Field) -> str:
@@ -547,11 +584,8 @@ def _get_order_attr_tuple(fields: list[Field]) -> str:
 
 
 def _make_comparator_builder(name: str, signal: str, field_map: FieldMap):
-    fields = [
-        field
-        for field in field_map.values()
-        if field.order is True or callable(field.order)
-    ]
+    fields = [field for field in field_map.values() if field.order is not False]
+
     if not fields:
         return (
             MethodBuilder(name, {f"_object_{name}": getattr(object, name)})
@@ -760,13 +794,17 @@ def _resolve_schematype(
 def _make_dataclass_fields(fields_map: FieldMap):
     dc_fields = {}
     for field in fields_map.values():
-        kwargs = {}
+        kwargs = {
+            "compare": field.eq or field.order,
+            "hash": bool(field.hash),
+            "repr": bool(field.repr),
+            "init": field.init,
+        }
         if field.has_default:
             kwargs["default"] = field.default
         if field.has_default_factory:
             kwargs["default_factory"] = field.default
-        if field.eq or field.order:
-            kwargs["compare"] = True
+
         dc_field: dataclasses.Field = dataclasses.field(**kwargs)
         dc_field.name = field.name
         dc_field.type = field.declared_type

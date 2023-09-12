@@ -72,7 +72,7 @@ class MethodBuilder:
 
     def build(self, cls: type) -> dict[str, Any]:
         method_name = self.prepare_method_name(cls)
-        method_annotations, method_script = self._make_methodstr(method_name)
+        method_annotations, method_script = self.make_methodstr(method_name)
         if cls.__module__ in sys.modules:
             self.merge_globs(sys.modules[cls.__module__].__dict__)
         func = _make_method(
@@ -85,19 +85,20 @@ class MethodBuilder:
         stamp_func(func)
         return {method_name: func}
 
-    def _make_methodstr(self, method_name: str):
+    def make_methodstr(self, method_name: str):
         method_header = f"def {method_name}("
         method_footer = "):"
         method_decorator = ""
+        funcargs = self.funcargs.copy()
 
         if self.meth_type is MethodType.STATIC:
             method_decorator = "@staticmethod\n"
         elif self.meth_type is MethodType.CLASS:
             method_decorator = "@classmethod\n"
-            self.funcargs.insert(0, "cls")
+            funcargs.insert(0, "cls")
         else:
-            self.funcargs.insert(0, "self")
-        args = ", ".join(self.funcargs)
+            funcargs.insert(0, "self")
+        args = ", ".join(funcargs)
         if self.funckargs:
             args += f'{", " if args else ""}*, {", ".join(self.funckargs)}'
         method_signature = method_header + args + method_footer

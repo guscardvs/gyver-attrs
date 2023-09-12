@@ -268,4 +268,71 @@ def info(
     )
 
 
+@overload
+def private(
+    *,
+    initial_factory: Callable[[], Any],
+    alias: str = "",
+    kw_only: bool = False,
+    eq: BoolOrCallable = True,
+    order: BoolOrCallable = True,
+    hash: BoolOrCallable = True,
+    repr: Union[bool, Callable[[Any], str]] = True,
+    asdict: Optional[Callable[[Any], Any]] = None,
+    fromdict: Optional[Callable[[Any], Any]] = None,
+):
+    ...
+
+
+@overload
+def private(
+    *,
+    initial: Any,
+    alias: str = "",
+    kw_only: bool = False,
+    eq: BoolOrCallable = True,
+    order: BoolOrCallable = True,
+    hash: BoolOrCallable = True,
+    repr: Union[bool, Callable[[Any], str]] = True,
+    asdict: Optional[Callable[[Any], Any]] = None,
+    fromdict: Optional[Callable[[Any], Any]] = None,
+):
+    ...
+
+
+def private(
+    *,
+    initial: Any = ...,
+    initial_factory: Callable[[], Any] = ...,
+    alias: str = "",
+    kw_only: bool = False,
+    eq: BoolOrCallable = True,
+    order: BoolOrCallable = True,
+    hash: BoolOrCallable = True,
+    repr: Union[bool, Callable[[Any], str]] = True,
+    asdict: Optional[Callable[[Any], Any]] = None,
+    fromdict: Optional[Callable[[Any], Any]] = None,
+):
+    """Declare metadata for a field not added to init.
+    :param initial: The initial value of the field.
+    :param initial_factory: A callable that returns the initial value of the field.
+    Parameters are the same as in info."""
+    if initial is Ellipsis and initial_factory is Ellipsis:
+        raise ValueError("No initial value provided")
+    if initial_factory is not Ellipsis:
+        initial = mark_factory(initial_factory)
+    return FieldInfo(
+        initial,
+        alias,
+        kw_only,
+        eq,
+        order,
+        False,
+        hash,
+        repr,
+        asdict,
+        fromdict,
+    )
+
+
 default_info: FieldInfo = info()

@@ -1,13 +1,15 @@
 import re
-from typing import Any, Callable, TypeVar, Union, get_args, get_origin
+from typing import Any, Callable, ForwardRef, TypeVar, Union, get_args, get_origin
 
 from .typedef import UNINITIALIZED, DisassembledType
 
 T = TypeVar("T")
 
 
-def disassemble_type(typ: type) -> DisassembledType:
-    return DisassembledType(typ, get_origin(typ), get_args(typ))
+def disassemble_type(typ: Union[type, str]) -> DisassembledType:
+    if isinstance(typ, str):
+        typ = ForwardRef(typ)  # type: ignore
+    return DisassembledType(typ, get_origin(typ), get_args(typ))  # type: ignore
 
 
 def frozen_setattr(self, name: str, value: Any):

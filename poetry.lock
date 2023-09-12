@@ -254,6 +254,20 @@ plugins = ["setuptools"]
 requirements-deprecated-finder = ["pip-api", "pipreqs"]
 
 [[package]]
+name = "lazy-fields"
+version = "1.0.0"
+description = "Lazy attributes to delay initialization"
+optional = false
+python-versions = ">=3.9,<4.0"
+files = [
+    {file = "lazy_fields-1.0.0-py3-none-any.whl", hash = "sha256:cbc669cc0cf5cb61b6125aecfe3e7f117ee98ab05c466190467d6edc57bbb61e"},
+    {file = "lazy_fields-1.0.0.tar.gz", hash = "sha256:c3f3ea40313d6748c80643f3527601988c3f568331d676481fcd55018e8f9415"},
+]
+
+[package.dependencies]
+typing-extensions = {version = ">=4.7.1,<5.0.0", markers = "python_full_version > \"3.0.0\" and python_version < \"3.11\""}
+
+[[package]]
 name = "mccabe"
 version = "0.7.0"
 description = "McCabe checker, plugin for flake8"
@@ -502,16 +516,16 @@ files = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.5.0"
+version = "4.7.1"
 description = "Backported and Experimental Type Hints for Python 3.7+"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "typing_extensions-4.5.0-py3-none-any.whl", hash = "sha256:fb33085c39dd998ac16d1431ebc293a8b3eedd00fd4a32de0ff79002c19511b4"},
-    {file = "typing_extensions-4.5.0.tar.gz", hash = "sha256:5cb5f4a79139d699607b3ef622a1dedafa84e115ab0024e0d9c044a9479ca7cb"},
+    {file = "typing_extensions-4.7.1-py3-none-any.whl", hash = "sha256:440d5dd3af93b060174bf433bccd69b0babc3b15b1a8dca43789fd7f61514b36"},
+    {file = "typing_extensions-4.7.1.tar.gz", hash = "sha256:b75ddc264f0ba5615db7ba217daeb99701ad295353c45f9e95963337ceeeffb2"},
 ]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "327353775f5c3b97e2fd1c087a608f3eb7a31450d3cf5e77eea69395f4fdb955"
+content-hash = "5019411ada9e7f85185286ddf98a911ccf6a13617856635941c42747e4c34795"
