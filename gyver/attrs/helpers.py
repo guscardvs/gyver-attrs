@@ -3,13 +3,13 @@ import sys
 from contextlib import contextmanager, suppress
 from functools import wraps
 from types import ModuleType
-from typing import Any, Callable, ForwardRef, Optional, Sequence, TypeVar, cast
+from typing import Any, Callable, ForwardRef, Optional, Sequence, TypeVar, Union, cast
 
 from typing_extensions import Concatenate, ParamSpec
 
 from .field import Field
-from .main import _get_parse_dict
-from .utils.functions import disassemble_type
+from .main import _build_cls, _get_gserialize, _get_parse_dict
+from .utils.functions import disassemble_type, get_forwardrefs, rebuild_type_from_depth
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -105,23 +105,30 @@ def update_ref(cls: type):
     updated_fields = {}
     fields_map = fields(cls)
     for field in fields_map.values():
-        type_ = field.declared_type
-        if not isinstance(type_, ForwardRef):
+        field.declared_type
+        _, frefs = get_forwardrefs(field.node)
+        if not frefs:
             continue
-        resolved = cast(ForwardRef, type_)._evaluate(
-            mod_globalns, mod_globalns, frozenset()
-        )
-        if not resolved:
-            raise TypeError(
-                f"Unable to resolve ForwardRef for {cls.__qualname__}.{field.name}"
+        for forwardref in frefs:
+            resolved = cast(ForwardRef, forwardref.type_)._evaluate(
+                mod_globalns, mod_globalns, frozenset()
             )
-        updated_fields[field.name] = field.duplicate(type_=disassemble_type(resolved))
+            if not resolved:
+                raise TypeError(
+                    f"Unable to resolve ForwardRef for {cls.__qualname__}.{field.name}"
+                )
+            forwardref.type_ = resolved
+        updated_fields[field.name] = field.duplicate(
+            type_=disassemble_type(rebuild_type_from_depth(field.node))
+        )
     if not updated_fields:
         return
     fields_map.update(updated_fields)
     parse_dict = _get_parse_dict(cls, fields_map)
-    (name, method), *_ = parse_dict.items()
-    type.__setattr__(cls, name, method)
+    gserialize = _get_gserialize(cls, fields_map)
+    for method_dict in (parse_dict, gserialize):
+        (name, method), *_ = method_dict.items()
+        type.__setattr__(cls, name, method)
 
 
 @validate_type
@@ -135,3 +142,29 @@ def _extract_klass(mod: ModuleType):
         with suppress(TypeError):
             items.append(_do_nothing(obj))
     return items
+
+
+def resolve_typevars(*vars: tuple[TypeVar, Union[str, type]]):
+    varsdict = dict(vars)
+
+    @validate_type
+    def resolver(cls: type):
+        if not hasattr(cls, "__build_opts__"):
+            raise TypeError(f"Unknown class {cls}")
+        fields_map = fields(cls)
+        updated_fields = {}
+        for field in fields_map.values():
+            if not field.has_type_vars:
+                continue
+            for typevar in field.type_.type_vars:
+                if typevar.type_ in varsdict:
+                    typevar.type_ = varsdict[typevar.type_]
+            updated_fields[field.name] = field.duplicate(
+                type_=disassemble_type(rebuild_type_from_depth(field.node))
+            )
+        fields_map.update(updated_fields)
+        return _build_cls(
+            getattr(cls, "__source__"), fields_map, **getattr(cls, "__build_opts__")
+        )
+
+    return resolver

@@ -1,9 +1,9 @@
 import dataclasses
 import sys
 import typing
-from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from enum import Enum
+from typing import Callable
 
 import typing_extensions
 
@@ -20,6 +20,17 @@ from gyver.attrs.utils.typedef import MISSING, UNINITIALIZED, Descriptor, InitOp
 T = typing.TypeVar("T")
 
 FieldMap = dict[str, Field]
+
+
+def __dataclass_transform__(
+    *,
+    eq_default: bool,
+    order_default: bool,
+    kw_only_default: bool,
+    frozen_default: bool,
+    field_descriptors: tuple[typing.Union[type, Callable[..., typing.Any]], ...],
+) -> Callable[[T], T]:
+    return lambda a: a
 
 
 @typing.overload
@@ -68,6 +79,13 @@ def define(
     kw_only_default=False,
     field_specifiers=(FieldInfo, info),
 )
+@__dataclass_transform__(  # Support for both formats of dataclass transform
+    eq_default=True,
+    order_default=True,
+    frozen_default=True,
+    kw_only_default=False,
+    field_descriptors=(FieldInfo, info),
+)
 def define(
     maybe_cls: typing.Optional[type[T]] = None,
     /,
@@ -115,42 +133,67 @@ def define(
             .build()
         )
         field_map = {field.name: field for field in fields}
-        clsdict = (
-            _get_clsdict(cls, field_map)
-            | _get_cls_metadata(cls)
-            | _get_init(
-                cls,
-                field_map,
-                {"frozen": frozen, "slots": slots, "init": init},
-            )
-            | _get_parse_dict(cls, field_map)
-            | _get_gserialize(cls, field_map)
-        )
-        if slots:
-            clsdict |= _get_slots_metadata(cls, field_map)
-        if repr:
-            clsdict |= _get_repr(cls, field_map)
-        if eq:
-            clsdict |= _get_eq(cls, field_map)
-            clsdict |= _get_ne(cls)
-        if order:
-            clsdict |= _get_order(cls, field_map)
-        if hash or (hash is None and frozen):
-            clsdict |= _get_hash(cls, field_map, bool(hash))
-        if pydantic:
-            clsdict |= _get_pydantic_handlers(cls, field_map)
-        if dataclass_fields:
-            clsdict |= _make_dataclass_fields(field_map)
-        maybe_freeze = freeze if frozen else lambda a: a
-        return maybe_freeze(
-            type(cls)(  # type: ignore
-                cls.__name__,
-                cls.__bases__,
-                clsdict,
-            )
+        return _build_cls(
+            cls,
+            field_map,
+            frozen=frozen,
+            kw_only=kw_only,
+            slots=slots,
+            repr=repr,
+            eq=eq,
+            order=order,
+            hash=hash,
+            pydantic=pydantic,
+            dataclass_fields=dataclass_fields,
+            init=init,
         )
 
     return wrap(maybe_cls) if maybe_cls is not None else wrap
+
+
+def _build_cls(cls: type, field_map: FieldMap, **opts) -> typing.Any:
+    hash = opts["hash"]
+    frozen = opts["frozen"]
+    slots = opts["slots"]
+    clsdict = (
+        _get_clsdict(cls, field_map)
+        | _get_cls_metadata(cls, opts)
+        | _get_init(
+            cls,
+            field_map,
+            {
+                "frozen": frozen,
+                "slots": slots,
+                "init": opts["init"],
+            },
+        )
+        | _get_parse_dict(cls, field_map)
+        | _get_gserialize(cls, field_map)
+    )
+
+    if slots:
+        clsdict |= _get_slots_metadata(cls, field_map)
+    if opts["repr"]:
+        clsdict |= _get_repr(cls, field_map)
+    if opts["eq"]:
+        clsdict |= _get_eq(cls, field_map)
+        clsdict |= _get_ne(cls)
+    if opts["order"]:
+        clsdict |= _get_order(cls, field_map)
+    if hash or (hash is None and frozen):
+        clsdict |= _get_hash(cls, field_map, bool(hash))
+    if opts["pydantic"]:
+        clsdict |= _get_pydantic_handlers(cls, field_map)
+    if opts["dataclass_fields"]:
+        clsdict |= _make_dataclass_fields(field_map)
+    maybe_freeze = freeze if frozen else lambda a: a
+    return maybe_freeze(
+        type(cls)(  # type: ignore
+            cls.__name__,
+            cls.__bases__,
+            clsdict,
+        )
+    )
 
 
 def _get_clsdict(cls: type, field_map: FieldMap):
@@ -188,8 +231,12 @@ def _is_descriptor_type(
     return hasattr(obj, "private_name") and hasattr(obj, "__get__")
 
 
-def _get_cls_metadata(cls: type):
-    return {"__qualname__": cls.__qualname__}
+def _get_cls_metadata(cls: type, opts: dict[str, typing.Any]):
+    return {
+        "__qualname__": cls.__qualname__,
+        "__source__": cls,
+        "__build_opts__": opts,
+    }
 
 
 def _make_setattr(frozen: bool):
@@ -346,7 +393,10 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
     builder = (
         MethodBuilder(
             "__parse_dict__",
-            {"deserialize": deserialize, "deserialize_mapping": deserialize_mapping},
+            {
+                "deserialize": deserialize,
+                "deserialize_mapping": deserialize_mapping,
+            },
         )
         .add_funcarg("alias")
         .add_annotation("alias", bool)
@@ -380,7 +430,10 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
 
 
 def _resolve_forward_ref(
-    field_type: typing.Any, cls: type, field: Field, mod_globalns: dict[str, typing.Any]
+    field_type: typing.Any,
+    cls: type,
+    field: Field,
+    mod_globalns: dict[str, typing.Any],
 ) -> tuple[typing.Any, bool]:
     if not isinstance(field_type, typing.ForwardRef) or field.asdict_:
         return field_type, True

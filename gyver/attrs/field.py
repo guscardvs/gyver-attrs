@@ -3,7 +3,7 @@ from typing import Any, Callable, Optional, Sequence, Union, overload
 from typing_extensions import Self
 
 from gyver.attrs.utils.factory import is_factory_marked, mark_factory
-from gyver.attrs.utils.typedef import MISSING, DisassembledType
+from gyver.attrs.utils.typedef import MISSING, DisassembledType, TypeNode
 
 BoolOrCallable = Union[bool, Callable[[Any], Any]]
 
@@ -74,6 +74,14 @@ class Field:
     @property
     def declared_type(self) -> type:
         return self.type_.type_
+
+    @property
+    def has_type_vars(self) -> bool:
+        return bool(self.type_.type_vars)
+
+    @property
+    def node(self) -> TypeNode:
+        return self.type_.typenode
 
     @property
     def field_type(self) -> type:

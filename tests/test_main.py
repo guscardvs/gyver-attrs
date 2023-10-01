@@ -137,6 +137,7 @@ def test_mro_uses_the_rightmost_parent_attribute():
     d = D()
 
     assert d.x == d.xx()
+    assert d.y == 20
 
 
 def test_eq_validates_equality_correctly():

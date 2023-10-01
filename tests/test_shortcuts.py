@@ -1,7 +1,7 @@
 from inspect import signature
-from typing import Any, Generator, Iterable, Sequence, TypeVar, get_type_hints
-from gyver.attrs import shortcuts, define
+from typing import Any, Generator, Sequence, TypeVar
 
+from gyver.attrs import define, shortcuts
 from gyver.attrs.utils.functions import disassemble_type
 
 
@@ -25,9 +25,7 @@ def _args_equal(
         ), disassemble_type(target_arg)
         if source_disassemble.origin:
             assert source_disassemble.origin == target_disasseble.origin
-            yield from _args_equal(
-                source_disassemble.args, target_disasseble.args
-            )
+            yield from _args_equal(source_disassemble.args, target_disasseble.args)
         elif isinstance(source_arg, TypeVar):
             yield source_arg.__name__ == target_arg.__name__
             yield source_arg.__bound__ == target_arg.__bound__  # type: ignore

@@ -1,4 +1,5 @@
 import dataclasses
+from types import MemberDescriptorType
 from typing import Sequence, cast
 
 from .field import Field, FieldInfo, default_info
@@ -48,7 +49,7 @@ class FieldsBuilder:
                     Sequence[Field],
                     getattr(parent, "__gyver_attrs__", {}).values(),
                 )
-                if field not in self.field_names and not field.inherited
+                if field.name not in self.field_names and not field.inherited
             )
         seen = set()
         for field in reversed(unfiltered_parent_fields):
@@ -60,6 +61,8 @@ class FieldsBuilder:
 
     def add_field(self, key: str, annotation: type):
         default = getattr(self.cls, key, MISSING)
+        if isinstance(default, MemberDescriptorType):
+            return self
         info = default_info.duplicate(default=default)
         if isinstance(default, FieldInfo):
             info = default
