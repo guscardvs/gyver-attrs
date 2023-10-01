@@ -1,3 +1,9 @@
+## 0.7.1 (2023-10-01)
+
+### Fix
+
+- added support for __dataclass_transform__ format
+
 ## 0.7.0 (2023-09-12)
 
 ### Feat
