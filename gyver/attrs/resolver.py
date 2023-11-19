@@ -1,6 +1,7 @@
 import dataclasses
+from collections.abc import Callable, Sequence
 from types import MemberDescriptorType
-from typing import Sequence, cast
+from typing import cast
 
 from .field import Field, FieldInfo, default_info
 from .utils.factory import is_factory_marked, mark_factory
@@ -17,6 +18,7 @@ class FieldsBuilder:
         "fields",
         "field_class",
         "dataclass_fields",
+        "alias_generator",
     )
 
     def __init__(
@@ -25,6 +27,7 @@ class FieldsBuilder:
         kw_only: bool,
         field_class: type[Field],
         dataclass_fields: bool,
+        alias_generator: Callable[[str], str],
     ):
         self.cls = cls
         self.kw_only = kw_only
@@ -33,6 +36,7 @@ class FieldsBuilder:
         self.fields: list[Field] = []
         self.field_class = field_class
         self.dataclass_fields = dataclass_fields
+        self.alias_generator = alias_generator
 
     def build(self):
         self._add_parent_fields()
@@ -72,7 +76,7 @@ class FieldsBuilder:
             self.field_class,
             name=key,
             type_=disassemble_type(annotation),
-            alias=info.alias or key,
+            alias=info.alias or self.alias_generator(key),
         )
         self.fields.append(field)
         self.field_names.add(field.name)

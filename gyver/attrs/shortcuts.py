@@ -1,4 +1,5 @@
 import typing
+from collections.abc import Callable
 
 import typing_extensions
 
@@ -26,6 +27,7 @@ def mutable(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -45,6 +47,7 @@ def mutable(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> type[T]:
     ...
 
@@ -69,6 +72,7 @@ def mutable(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
@@ -83,6 +87,7 @@ def mutable(
         pydantic=pydantic,
         dataclass_fields=dataclass_fields,
         field_class=field_class,
+        alias_generator=alias_generator,
     )
 
 
@@ -101,6 +106,7 @@ def kw_only(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -120,6 +126,7 @@ def kw_only(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> type[T]:
     ...
 
@@ -144,6 +151,7 @@ def kw_only(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
@@ -158,6 +166,7 @@ def kw_only(
         pydantic=pydantic,
         dataclass_fields=dataclass_fields,
         field_class=field_class,
+        alias_generator=alias_generator,
     )
 
 
@@ -176,6 +185,7 @@ def schema_class(
     hash: typing.Optional[bool] = None,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> typing.Callable[[type[T]], type[T]]:
     ...
 
@@ -195,6 +205,7 @@ def schema_class(
     hash: typing.Optional[bool] = None,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> type[T]:
     ...
 
@@ -219,6 +230,7 @@ def schema_class(
     hash: typing.Optional[bool] = None,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> ReturnT[T]:
     return define(
         maybe_cls,
@@ -233,4 +245,5 @@ def schema_class(
         pydantic=True,
         dataclass_fields=dataclass_fields,
         field_class=field_class,
+        alias_generator=alias_generator,
     )

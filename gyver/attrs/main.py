@@ -49,6 +49,7 @@ def define(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> Callable[[type[T]], type[T]]:
     ...
 
@@ -69,6 +70,7 @@ def define(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> type[T]:
     ...
 
@@ -101,6 +103,7 @@ def define(
     pydantic: bool = False,
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
+    alias_generator: Callable[[str], str] = str,
 ) -> typing.Union[Callable[[type[T]], type[T]], type[T]]:
     """
     Decorator function that adds functionality to a data class.
@@ -118,6 +121,8 @@ def define(
     not to facilitate integration with pydantic.
     :param dataclass_fields: bool, whether to add __dataclass_fields__ with the
     dataclass format. This way, the class becomes a drop-in replacement for dataclasses.
+    :param alias_generator: Callable[[str], str], automatic alias using the callable passed
+    as parameter.
     **Warning**: dataclass_fields with pydantic=False will fail when trying to use with
     pydantic.
 
@@ -128,7 +133,7 @@ def define(
 
     def wrap(cls: type[T]) -> type[T]:
         fields = (
-            FieldsBuilder(cls, kw_only, field_class, dataclass_fields)
+            FieldsBuilder(cls, kw_only, field_class, dataclass_fields, alias_generator)
             .from_annotations()
             .build()
         )

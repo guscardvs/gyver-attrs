@@ -1,4 +1,5 @@
-from typing import Any, Callable, Literal, Optional, TypeVar, Union, overload
+from collections.abc import Callable
+from typing import Any, Literal, Optional, TypeVar, Union, overload
 
 import typing_extensions
 
@@ -11,6 +12,7 @@ from .utils.typedef import DisassembledType
 T = TypeVar("T")
 
 
+@typing_extensions.deprecated("Use the `alias_generator` parameter instead instead")
 class ToCamelField(Field):
     def __init__(
         self,
@@ -32,9 +34,14 @@ class ToCamelField(Field):
             eq,
             order,
             inherited,
+            False,
+            True,
+            None,
+            None,
         )
 
 
+@typing_extensions.deprecated("Use the `alias_generator` parameter instead instead")
 class ToUpperCamelField(Field):
     def __init__(
         self,
@@ -56,6 +63,10 @@ class ToUpperCamelField(Field):
             eq,
             order,
             inherited,
+            False,
+            True,
+            None,
+            None,
         )
 
 
