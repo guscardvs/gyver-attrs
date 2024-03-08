@@ -24,8 +24,8 @@ def asjson(
     *,
     by_alias: bool = True,
 ) -> str:
-    if not hasattr(obj, "__gyver_attrs__"):
-        raise TypeError("Unable to parse classes not defined with `define`")
+    if not hasattr(obj, '__gyver_attrs__'):
+        raise TypeError('Unable to parse classes not defined with `define`')
 
     return json_dumps(asdict(obj, by_alias=by_alias))
 

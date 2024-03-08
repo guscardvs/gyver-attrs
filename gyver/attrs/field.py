@@ -1,4 +1,5 @@
-from typing import Any, Callable, Optional, Sequence, Union, overload
+from collections.abc import Callable, Sequence
+from typing import Any, Optional, Union, overload
 
 from typing_extensions import Self
 
@@ -10,19 +11,19 @@ BoolOrCallable = Union[bool, Callable[[Any], Any]]
 
 class Field:
     __slots__ = (
-        "name",
-        "type_",
-        "kw_only",
-        "default",
-        "alias",
-        "eq",
-        "order",
-        "init",
-        "hash",
-        "repr",
-        "asdict_",
-        "fromdict",
-        "inherited",
+        'name',
+        'type_',
+        'kw_only',
+        'default',
+        'alias',
+        'eq',
+        'order',
+        'init',
+        'hash',
+        'repr',
+        'asdict_',
+        'fromdict',
+        'inherited',
     )
 
     def __init__(
@@ -103,24 +104,24 @@ class Field:
         default_name = (
             self.default.__name__ if self.has_default_factory else self.default
         )
-        return "Field(" + (
-            ", ".join(
+        return 'Field(' + (
+            ', '.join(
                 (
-                    f"name={self.name}",
-                    f"type_={self.type_}",
-                    f"default={default_name}",
-                    f"kw_only={self.kw_only}",
-                    f"alias={self.alias}",
-                    f"eq={self.eq}",
-                    f"order={self.order}",
-                    f"init={self.init}",
-                    f"hash={self.hash}",
-                    f"repr={self.repr}",
-                    f"asdict_={self.asdict_}",
-                    f"inherited={self.inherited}",
+                    f'name={self.name}',
+                    f'type_={self.type_}',
+                    f'default={default_name}',
+                    f'kw_only={self.kw_only}',
+                    f'alias={self.alias}',
+                    f'eq={self.eq}',
+                    f'order={self.order}',
+                    f'init={self.init}',
+                    f'hash={self.hash}',
+                    f'repr={self.repr}',
+                    f'asdict_={self.asdict_}',
+                    f'inherited={self.inherited}',
                 )
             )
-            + ")"
+            + ')'
         )
 
     def asdict(self):
@@ -135,16 +136,16 @@ class Field:
 
 class FieldInfo:
     __slots__ = (
-        "default",
-        "kw_only",
-        "alias",
-        "eq",
-        "order",
-        "init",
-        "hash",
-        "repr",
-        "asdict_",
-        "fromdict",
+        'default',
+        'kw_only',
+        'alias',
+        'eq',
+        'order',
+        'init',
+        'hash',
+        'repr',
+        'asdict_',
+        'fromdict',
     )
 
     def __init__(
@@ -185,7 +186,7 @@ class FieldInfo:
 def info(
     *,
     default_factory: Callable[[], Any],
-    alias: str = "",
+    alias: str = '',
     kw_only: bool = False,
     eq: BoolOrCallable = True,
     order: BoolOrCallable = True,
@@ -202,7 +203,7 @@ def info(
 def info(
     *,
     default: Any,
-    alias: str = "",
+    alias: str = '',
     kw_only: bool = False,
     eq: BoolOrCallable = True,
     order: BoolOrCallable = True,
@@ -218,7 +219,7 @@ def info(
 @overload
 def info(
     *,
-    alias: str = "",
+    alias: str = '',
     kw_only: bool = False,
     eq: BoolOrCallable = True,
     order: BoolOrCallable = True,
@@ -234,8 +235,8 @@ def info(
 def info(
     *,
     default: Any = ...,
-    default_factory: Callable[[], Any] = ...,
-    alias: str = "",
+    default_factory: Callable[[], Any] = ...,  # type: ignore
+    alias: str = '',
     kw_only: bool = False,
     eq: BoolOrCallable = True,
     order: BoolOrCallable = True,
@@ -280,7 +281,7 @@ def info(
 def private(
     *,
     initial_factory: Callable[[], Any],
-    alias: str = "",
+    alias: str = '',
     kw_only: bool = False,
     eq: BoolOrCallable = True,
     order: BoolOrCallable = True,
@@ -288,15 +289,14 @@ def private(
     repr: Union[bool, Callable[[Any], str]] = True,
     asdict: Optional[Callable[[Any], Any]] = None,
     fromdict: Optional[Callable[[Any], Any]] = None,
-):
-    ...
+): ...
 
 
 @overload
 def private(
     *,
     initial: Any,
-    alias: str = "",
+    alias: str = '',
     kw_only: bool = False,
     eq: BoolOrCallable = True,
     order: BoolOrCallable = True,
@@ -304,15 +304,14 @@ def private(
     repr: Union[bool, Callable[[Any], str]] = True,
     asdict: Optional[Callable[[Any], Any]] = None,
     fromdict: Optional[Callable[[Any], Any]] = None,
-):
-    ...
+): ...
 
 
 def private(
     *,
     initial: Any = ...,
-    initial_factory: Callable[[], Any] = ...,
-    alias: str = "",
+    initial_factory: Callable[[], Any] = ...,  # type: ignore
+    alias: str = '',
     kw_only: bool = False,
     eq: BoolOrCallable = True,
     order: BoolOrCallable = True,
@@ -326,7 +325,7 @@ def private(
     :param initial_factory: A callable that returns the initial value of the field.
     Parameters are the same as in info."""
     if initial is Ellipsis and initial_factory is Ellipsis:
-        raise ValueError("No initial value provided")
+        raise ValueError('No initial value provided')
     if initial_factory is not Ellipsis:
         initial = mark_factory(initial_factory)
     return FieldInfo(

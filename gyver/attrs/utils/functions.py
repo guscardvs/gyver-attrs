@@ -1,9 +1,10 @@
 import re
-from typing import Any, Callable, ForwardRef, TypeVar, Union, get_args, get_origin
+from collections.abc import Callable
+from typing import Any, ForwardRef, TypeVar, Union, get_args, get_origin
 
 from .typedef import UNINITIALIZED, DisassembledType, TypeNode
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 def disassemble_type(typ: Union[type, str]) -> DisassembledType:
@@ -76,8 +77,8 @@ def get_forwardrefs(
 
 
 def rebuild_type(origin: type, args: tuple[Union[ForwardRef, type], ...]) -> type:
-    if not hasattr(origin, "__getitem__"):
-        raise TypeError("Unable to support rebuild, type has no __getitem__")
+    if not hasattr(origin, '__getitem__'):
+        raise TypeError('Unable to support rebuild, type has no __getitem__')
     try:
         return origin.__getitem__(*args)  # type: ignore
     except TypeError:
@@ -118,26 +119,26 @@ def frozen_setattr(self, name: str, value: Any):
         return object.__setattr__(self, name, value)
     del value
     raise AttributeError(
-        f"Class {type(self)} is frozen, and attribute {name} cannot be set"
+        f'Class {type(self)} is frozen, and attribute {name} cannot be set'
     )
 
 
 def frozen_delattr(self, name: str):
     raise AttributeError(
-        f"Class {type(self)} is frozen, and attribute {name} cannot be deleted"
+        f'Class {type(self)} is frozen, and attribute {name} cannot be deleted'
     )
 
 
 def frozen(cls: type[T]) -> type[T]:
-    setattr(cls, "__setattr__", frozen_setattr)
-    setattr(cls, "__delattr__", frozen_delattr)
+    cls.__setattr__ = frozen_setattr
+    cls.__delattr__ = frozen_delattr
     return cls
 
 
 def indent(string: str, *, skip_line: bool = False) -> str:
-    returnstr = f"    {string}"
+    returnstr = f'    {string}'
     if skip_line:
-        returnstr = "\n" + returnstr
+        returnstr = '\n' + returnstr
     return returnstr
 
 
@@ -148,7 +149,7 @@ def stamp_func(item: Union[Callable, classmethod, staticmethod]):
     to_stamp = item
     if isinstance(item, (classmethod, staticmethod)):
         to_stamp = item.__func__
-    setattr(to_stamp, "__gattrs_func__", True)
+    to_stamp.__gattrs_func__ = True
 
 
 def implements(cls: type, name: str):
@@ -156,20 +157,20 @@ def implements(cls: type, name: str):
     if attr is _sentinel:
         return False
 
-    if hasattr(attr, "__gattrs_func__"):
+    if hasattr(attr, '__gattrs_func__'):
         return False
 
-    if func := getattr(attr, "__func__", None):
-        if hasattr(func, "__gattrs_func__"):
+    if func := getattr(attr, '__func__', None):
+        if hasattr(func, '__gattrs_func__'):
             return False
     return all(getattr(base_cls, name, None) is not attr for base_cls in cls.mro()[1:])
 
 
-_to_camel_regex = re.compile("_([a-zA-Z])")
+_to_camel_regex = re.compile('_([a-zA-Z])')
 
 
 def to_camel(string: str) -> str:
-    return _to_camel_regex.sub(lambda match: match[1].upper(), string.strip("_"))
+    return _to_camel_regex.sub(lambda match: match[1].upper(), string.strip('_'))
 
 
 def to_upper_camel(string: str) -> str:

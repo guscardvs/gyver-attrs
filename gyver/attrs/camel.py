@@ -9,10 +9,10 @@ from .field import Field, FieldInfo, info
 from .utils.functions import to_camel, to_upper_camel
 from .utils.typedef import DisassembledType
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
-@typing_extensions.deprecated("Use the `alias_generator` parameter instead instead")
+@typing_extensions.deprecated('Use the `alias_generator` parameter instead instead')
 class ToCamelField(Field):
     def __init__(
         self,
@@ -41,7 +41,7 @@ class ToCamelField(Field):
         )
 
 
-@typing_extensions.deprecated("Use the `alias_generator` parameter instead instead")
+@typing_extensions.deprecated('Use the `alias_generator` parameter instead instead')
 class ToUpperCamelField(Field):
     def __init__(
         self,
@@ -75,7 +75,7 @@ def define_camel(
     maybe_cls: None = None,
     /,
     *,
-    style: Literal["upper", "lower"] = "lower",
+    style: Literal['upper', 'lower'] = 'lower',
     frozen: bool = True,
     kw_only: bool = False,
     slots: bool = True,
@@ -85,8 +85,7 @@ def define_camel(
     hash: Optional[bool] = None,
     pydantic: bool = True,
     dataclass_fields: bool = False,
-) -> Callable[[type[T]], type[T]]:
-    ...
+) -> Callable[[type[T]], type[T]]: ...
 
 
 @overload
@@ -94,7 +93,7 @@ def define_camel(
     maybe_cls: type[T],
     /,
     *,
-    style: Literal["upper", "lower"] = "lower",
+    style: Literal['upper', 'lower'] = 'lower',
     frozen: bool = True,
     kw_only: bool = False,
     slots: bool = True,
@@ -104,8 +103,7 @@ def define_camel(
     hash: Optional[bool] = None,
     pydantic: bool = True,
     dataclass_fields: bool = False,
-) -> type[T]:
-    ...
+) -> type[T]: ...
 
 
 @typing_extensions.dataclass_transform(
@@ -118,7 +116,7 @@ def define_camel(
     maybe_cls: Optional[type[T]] = None,
     /,
     *,
-    style: Literal["upper", "lower"] = "lower",
+    style: Literal['upper', 'lower'] = 'lower',
     frozen: bool = True,
     kw_only: bool = False,
     slots: bool = True,
@@ -129,7 +127,7 @@ def define_camel(
     pydantic: bool = True,
     dataclass_fields: bool = False,
 ) -> Union[Callable[[type[T]], type[T]], type[T]]:
-    field_class = ToCamelField if style == "lower" else ToUpperCamelField
+    field_class = ToCamelField if style == 'lower' else ToUpperCamelField
     return define(
         maybe_cls,
         frozen=frozen,

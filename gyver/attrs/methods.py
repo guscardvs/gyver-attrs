@@ -11,9 +11,9 @@ EllipsisType = type(...)
 
 
 class MethodType(str, Enum):
-    INSTANCE = "instance"
-    CLASS = "class"
-    STATIC = "static"
+    INSTANCE = 'instance'
+    CLASS = 'class'
+    STATIC = 'static'
 
 
 class MethodBuilder:
@@ -68,7 +68,7 @@ class MethodBuilder:
 
     @staticmethod
     def make_gattrs_name(method_name: str) -> str:
-        return "_".join(("__gattrs", method_name.lstrip("_")))
+        return '_'.join(('__gattrs', method_name.lstrip('_')))
 
     def build(self, cls: type) -> dict[str, Any]:
         method_name = self.prepare_method_name(cls)
@@ -86,24 +86,24 @@ class MethodBuilder:
         return {method_name: func}
 
     def make_methodstr(self, method_name: str):
-        method_header = f"def {method_name}("
-        method_footer = "):"
-        method_decorator = ""
+        method_header = f'def {method_name}('
+        method_footer = '):'
+        method_decorator = ''
         funcargs = self.funcargs.copy()
 
         if self.meth_type is MethodType.STATIC:
-            method_decorator = "@staticmethod\n"
+            method_decorator = '@staticmethod\n'
         elif self.meth_type is MethodType.CLASS:
-            method_decorator = "@classmethod\n"
-            funcargs.insert(0, "cls")
+            method_decorator = '@classmethod\n'
+            funcargs.insert(0, 'cls')
         else:
-            funcargs.insert(0, "self")
-        args = ", ".join(funcargs)
+            funcargs.insert(0, 'self')
+        args = ', '.join(funcargs)
         if self.funckargs:
             args += f'{", " if args else ""}*, {", ".join(self.funckargs)}'
         method_signature = method_header + args + method_footer
 
-        method_body = "\n    ".join(self.script_lines) if self.script_lines else "pass"
+        method_body = '\n    '.join(self.script_lines) if self.script_lines else 'pass'
         if method_decorator:
             method_signature = method_decorator + method_signature
 
@@ -112,7 +112,7 @@ class MethodBuilder:
             for name, value in self.annotations.items()
             if value is not Ellipsis
         }
-        method_script = f"{method_signature}\n    {method_body}"
+        method_script = f'{method_signature}\n    {method_body}'
         return method_annotations, method_script
 
 
@@ -139,7 +139,7 @@ def _make_method(
         old_val = linecache.cache.setdefault(filename, linecache_tuple)
         if old_val == linecache_tuple:
             break
-        filename = f"{base_filename[:-1]}-{count}>"
+        filename = f'{base_filename[:-1]}-{count}>'
         count += 1
 
     _compile_and_eval(script, globs, locs, filename)
@@ -151,12 +151,12 @@ def _compile_and_eval(
     script: str,
     globs: dict[str, Any],
     locs: Optional[Mapping[str, Any]] = None,
-    filename: str = "",
+    filename: str = '',
 ) -> None:
     """
     "Exec" the script with the given global (globs) and local (locs) variables.
     """
-    bytecode = compile(script, filename, "exec")
+    bytecode = compile(script, filename, 'exec')
     eval(bytecode, globs, locs)
 
 

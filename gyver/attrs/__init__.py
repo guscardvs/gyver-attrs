@@ -8,24 +8,24 @@ from .utils.factory import mark_factory
 from .utils.typedef import UNINITIALIZED
 
 __all__ = [
-    "info",
-    "private",
-    "define",
-    "define_camel",
-    "mark_factory",
-    "asdict",
-    "asjson",
-    "fromjson",
-    "fromdict",
-    "fields",
-    "call_init",
-    "init_hooks",
-    "mutable",
-    "kw_only",
-    "UNINITIALIZED",
-    "update_ref",
-    "update_refs",
+    'info',
+    'private',
+    'define',
+    'define_camel',
+    'mark_factory',
+    'asdict',
+    'asjson',
+    'fromjson',
+    'fromdict',
+    'fields',
+    'call_init',
+    'init_hooks',
+    'mutable',
+    'kw_only',
+    'UNINITIALIZED',
+    'update_ref',
+    'update_refs',
 ]
 
-__version__ = "0.8.0"
-__version_info__ = tuple(map(int, __version__.split(".")))
+__version__ = '0.8.0'
+__version_info__ = tuple(map(int, __version__.split('.')))

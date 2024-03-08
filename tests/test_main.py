@@ -1,5 +1,6 @@
 import pathlib
 import typing
+from collections.abc import Callable, Sequence
 from dataclasses import field
 from unittest.mock import Mock
 
@@ -17,7 +18,7 @@ class Person:
 
 
 def test_instantiation_runs_without_errors():
-    Person("John Doe", 46)
+    Person('John Doe', 46)
 
 
 def test_no_slots_class_is_also_valid():
@@ -27,14 +28,14 @@ def test_no_slots_class_is_also_valid():
 
     ns = NoSlots(1)
 
-    assert {"x": 1} == getattr(ns, "__dict__")
+    assert {'x': 1} == ns.__dict__
 
 
 def test_frozen_works_correctly():
-    person = Person("John Doe", 46)
+    person = Person('John Doe', 46)
 
     with pytest.raises(AttributeError):
-        person.name = "Jane Doe"
+        person.name = 'Jane Doe'
 
 
 def test_frozen_can_be_disabled():
@@ -56,8 +57,8 @@ def test_repr_returns_the_expected_string():
         name: str = info(repr=str.title)
         password: str = info(repr=False)
 
-    person = Person("Jane Doe", 30)
-    another = Another("test@example.com", "valerica", "Very Important Secret")
+    person = Person('Jane Doe', 30)
+    another = Another('test@example.com', 'valerica', 'Very Important Secret')
 
     assert repr(person) == "Person(name='Jane Doe', age=30)"
     assert repr(another) == "Another(email='test@example.com', name='Valerica')"
@@ -102,12 +103,12 @@ def test_exceptions_are_detected_and_handled():
         other: int
 
     with pytest.raises(E) as ei:
-        raise E("yolo", 42)
+        raise E('yolo', 42)
 
     e = ei.value
 
-    assert ("yolo", 42) == e.args
-    assert "yolo" == e.msg
+    assert ('yolo', 42) == e.args
+    assert 'yolo' == e.msg
     assert 42 == e.other
 
 
@@ -184,7 +185,7 @@ def test_attrs_allow_addition_of_descriptors_on_slotted_classes():
 
         def __set_name__(self, owner: type, name: str):
             self.public_name = name
-            self.private_name = f"_access_counter_{name}"
+            self.private_name = f'_access_counter_{name}'
 
         def __get__(self, instance, owner):
             if not instance:
@@ -198,20 +199,20 @@ def test_attrs_allow_addition_of_descriptors_on_slotted_classes():
     class MyCls:
         @AccessCounter
         def a(self):
-            return "Hello"
+            return 'Hello'
 
     instance = MyCls()
 
     assert MyCls.a.private_name in MyCls.__slots__
-    assert instance.a == ("Hello", 0)
-    assert instance.a == ("Hello", 1)
-    assert instance.a == ("Hello", 2)
+    assert instance.a == ('Hello', 0)
+    assert instance.a == ('Hello', 1)
+    assert instance.a == ('Hello', 2)
 
 
 def test_alias_support_works_correctly():
     @define
     class A:
-        x: int = info(alias="xVal")
+        x: int = info(alias='xVal')
 
     a = A(xVal=2)
 
@@ -245,7 +246,7 @@ def test_define_compares_correctly_with_parser():
     class A:
         x: int = info(eq=lambda val: val % 3)
 
-    assert Person("John") == Person("john") != Person("jane")
+    assert Person('John') == Person('john') != Person('jane')
     assert A(3) == A(6) != A(7)
 
 
@@ -270,11 +271,11 @@ def test_define_creates_ordering_correctly():
     for item in sorted(items):
         assert item is expected.pop(0)
 
-    for item in ["__lt__", "__gt__", "__le__", "__ge__"]:
+    for item in ['__lt__', '__gt__', '__le__', '__ge__']:
         assert hasattr(A, item)
 
     with pytest.raises(TypeError):
-        Unorderable(1) > Unorderable(2)  # type: ignore
+        Unorderable(1) > Unorderable(2)  # type: ignore  # noqa: B015
 
 
 def test_define_creates_ordering_only_for_direct_instances():
@@ -286,7 +287,7 @@ def test_define_creates_ordering_only_for_direct_instances():
         pass
 
     with pytest.raises(TypeError):
-        A(1) < B(1)  # type: ignore
+        A(1) < B(1)  # type: ignore  # noqa: B015
 
 
 def test_define_creates_hashable_classes():
@@ -338,10 +339,10 @@ def test_define_does_not_create_hashable_when_it_shouldnt():
     with pytest.raises(TypeError) as exc_info:
         define(hash=True)(C)
 
-    assert exc_info.value.args == ("field type is not hashable", "x", C)
+    assert exc_info.value.args == ('field type is not hashable', 'x', C)
     assert not issubclass(
         define(C), typing.Hashable
-    ), "should not complain if class does not want explicitly hash"
+    ), 'should not complain if class does not want explicitly hash'
 
 
 def test_define_does_not_overwrite_methods_but_creates_gattrs_alternatives():
@@ -358,7 +359,7 @@ def test_define_does_not_overwrite_methods_but_creates_gattrs_alternatives():
             self.__gattrs_init__(a, b)
 
         def __repr__(self):
-            return f"B(a={self.a}, b={self.b})"
+            return f'B(a={self.a}, b={self.b})'
 
         def __eq__(self, other):
             if other.__class__ is self.__class__:
@@ -399,24 +400,24 @@ def test_define_does_not_overwrite_methods_but_creates_gattrs_alternatives():
             return hash((self.__class__, self.a, self.b))
 
     methods = [
-        "__init__",
-        "__repr__",
-        "__eq__",
-        "__hash__",
-        "__ne__",
-        "__lt__",
-        "__le__",
-        "__gt__",
-        "__ge__",
+        '__init__',
+        '__repr__',
+        '__eq__',
+        '__hash__',
+        '__ne__',
+        '__lt__',
+        '__le__',
+        '__gt__',
+        '__ge__',
     ]
 
     for method in methods:
-        gattr_method = "_".join(("__gattrs", method.lstrip("_")))
+        gattr_method = '_'.join(('__gattrs', method.lstrip('_')))
         assert hasattr(A, method) and not hasattr(A, gattr_method)
         assert hasattr(B, gattr_method)
 
 
-Validator = typing.Callable[[typing.Any], bool]
+Validator = Callable[[typing.Any], bool]
 
 
 def test_defines_correctly_classes_with_non_types_as_hints():
@@ -425,7 +426,7 @@ def test_defines_correctly_classes_with_non_types_as_hints():
         validator: Validator
         root: pathlib.Path
         look_on: typing.Optional[pathlib.Path] = None
-        exclude: typing.Sequence[typing.Union[str, pathlib.Path]] = ()
+        exclude: Sequence[typing.Union[str, pathlib.Path]] = ()
 
 
 def test_init_false_does_sets_values_with_proper_initial_values():
@@ -436,19 +437,19 @@ def test_init_false_does_sets_values_with_proper_initial_values():
         age: int = info(init=False, default=18)
         friend: list[str] = info(init=False, default_factory=list)
 
-    whatever = Whatever("hello")
+    whatever = Whatever('hello')
 
     assert whatever.email is UNINITIALIZED
     assert whatever.age == 18
     assert whatever.friend == []
 
-    assert "email" not in typing.get_type_hints(Whatever.__init__)
+    assert 'email' not in typing.get_type_hints(Whatever.__init__)
 
-    whatever.email = "world"
-    assert whatever.email == "world"
+    whatever.email = 'world'
+    assert whatever.email == 'world'
 
     with pytest.raises(AttributeError):
-        whatever.email = "Hello"
+        whatever.email = 'Hello'
 
 
 def test_define_init_does_not_add_init_function():
@@ -457,12 +458,12 @@ def test_define_init_does_not_add_init_function():
         name: str
 
     assert Whatever.__init__ is object.__init__
-    assert hasattr(Whatever, MethodBuilder.make_gattrs_name("__init__"))
+    assert hasattr(Whatever, MethodBuilder.make_gattrs_name('__init__'))
 
     whatever = Whatever()
-    call_init(whatever, name="Hello")
+    call_init(whatever, name='Hello')
 
-    assert whatever.name == "Hello"
+    assert whatever.name == 'Hello'
 
 
 def test_init_hooks():
@@ -495,13 +496,13 @@ def test_init_hooks():
         pre_callbacks=[pre_callback],
         post_callbacks=[post_callback],
     ):
-        assert hasattr(obj, "pre_init_called")  # pre-init should be called
-        assert not hasattr(obj, "post_init_called")  # post-init should not be called
+        assert hasattr(obj, 'pre_init_called')  # pre-init should be called
+        assert not hasattr(obj, 'post_init_called')  # post-init should not be called
         assert pre_callback_called is True  # Pre-callback should be called
         assert post_callback_called is False  # Post-callback should not be called
 
     assert hasattr(
-        obj, "post_init_called"
+        obj, 'post_init_called'
     )  # post-init should be called after the context
 
     pre_callback_called = False
@@ -510,11 +511,11 @@ def test_init_hooks():
     del obj.post_init_called, obj.pre_init_called
 
     with init_hooks(obj):
-        assert hasattr(obj, "pre_init_called")  # pre-init should be called
-        assert not hasattr(obj, "post_init_called")  # post-init should not be called
+        assert hasattr(obj, 'pre_init_called')  # pre-init should be called
+        assert not hasattr(obj, 'post_init_called')  # post-init should not be called
 
     assert hasattr(
-        obj, "post_init_called"
+        obj, 'post_init_called'
     )  # post-init should be called after the context
 
 
@@ -536,15 +537,15 @@ def test_define_is_drop_in_replacement_for_dataclass():
         name: str = field(init=False)
         email: str = field(hash=False)
         age: int = field(compare=False)
-        password: str = field(default="MyPassword")
+        password: str = field(default='MyPassword')
         friends: list[str] = field(default_factory=list)
 
-    default_obj = Test(1, email="Hello", age=18)
-    another = Test(0, email="World", age=19)
+    default_obj = Test(1, email='Hello', age=18)
+    another = Test(0, email='World', age=19)
 
     assert default_obj.name is UNINITIALIZED
-    assert default_obj.email == "Hello"
-    assert default_obj.password == "MyPassword"
+    assert default_obj.email == 'Hello'
+    assert default_obj.password == 'MyPassword'
     assert default_obj.friends == []
 
     assert sorted([default_obj, another]) == [another, default_obj]

@@ -20,9 +20,10 @@ def _args_equal(
     source: Sequence[type], target: Sequence[type]
 ) -> Generator[bool, None, None]:
     for source_arg, target_arg in zip(source, target):
-        source_disassemble, target_disasseble = disassemble_type(
-            source_arg
-        ), disassemble_type(target_arg)
+        source_disassemble, target_disasseble = (
+            disassemble_type(source_arg),
+            disassemble_type(target_arg),
+        )
         if source_disassemble.origin:
             assert source_disassemble.origin == target_disasseble.origin
             yield from _args_equal(source_disassemble.args, target_disasseble.args)
@@ -36,14 +37,16 @@ def _args_equal(
 def test_shortcuts_are_up_to_date_with_define():
     define_hints, define_defaults = _get_annotations_and_defaults(define)
 
-    for without, (hints, defaults) in map(
-        lambda v: (v[0], _get_annotations_and_defaults(v[1])),
-        (
-            ("frozen", shortcuts.mutable),
-            ("kw_only", shortcuts.kw_only),
-            ("pydantic", shortcuts.schema_class),
-        ),
-    ):
+    annotation_generator = (
+        (v[0], _get_annotations_and_defaults(v[1]))
+        for v in (
+            ('frozen', shortcuts.mutable),
+            ('kw_only', shortcuts.kw_only),
+            ('pydantic', shortcuts.schema_class),
+        )
+    )
+
+    for without, (hints, defaults) in annotation_generator:
         for key, value in define_hints.items():
             if key == without:
                 continue

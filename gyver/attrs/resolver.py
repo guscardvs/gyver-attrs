@@ -11,14 +11,14 @@ from .utils.typedef import MISSING
 
 class FieldsBuilder:
     __slots__ = (
-        "cls",
-        "kw_only",
-        "field_names",
-        "parent_fields",
-        "fields",
-        "field_class",
-        "dataclass_fields",
-        "alias_generator",
+        'cls',
+        'kw_only',
+        'field_names',
+        'parent_fields',
+        'fields',
+        'field_class',
+        'dataclass_fields',
+        'alias_generator',
     )
 
     def __init__(
@@ -51,7 +51,7 @@ class FieldsBuilder:
                 field.inherit()
                 for field in cast(
                     Sequence[Field],
-                    getattr(parent, "__gyver_attrs__", {}).values(),
+                    getattr(parent, '__gyver_attrs__', {}).values(),
                 )
                 if field.name not in self.field_names and not field.inherited
             )
@@ -83,7 +83,7 @@ class FieldsBuilder:
         return self
 
     def from_annotations(self):
-        if not hasattr(self.cls, "__annotations__"):
+        if not hasattr(self.cls, '__annotations__'):
             return self
         for key, val in self.cls.__annotations__.items():
             self.add_field(key, val)
@@ -91,39 +91,39 @@ class FieldsBuilder:
 
     def _info_from_dc(self, field: dataclasses.Field) -> FieldInfo:
         kwargs: dict = default_info.asdict() | {
-            "init": field.init,
-            "hash": field.hash,
-            "eq": field.compare,
-            "order": field.compare,
-            "repr": field.repr,
+            'init': field.init,
+            'hash': field.hash,
+            'eq': field.compare,
+            'order': field.compare,
+            'repr': field.repr,
         }
         if field.default_factory is not dataclasses.MISSING:
-            kwargs["default"] = (
+            kwargs['default'] = (
                 field.default_factory
                 if is_factory_marked(field.default_factory)
                 else mark_factory(field.default_factory)
             )
         elif field.default is not dataclasses.MISSING:
-            kwargs["default"] = field.default
+            kwargs['default'] = field.default
         else:
-            kwargs["default"] = MISSING
+            kwargs['default'] = MISSING
         # python 3.10+ support
-        if kw_only := getattr(field, "kw_only", default_info.kw_only):
-            kwargs["kw_only"] = kw_only
+        if kw_only := getattr(field, 'kw_only', default_info.kw_only):
+            kwargs['kw_only'] = kw_only
         return FieldInfo(**kwargs)
 
 
 def _validate_fields_order(fields: list[Field]):
     had_default = False
-    last_default_field = ""
+    last_default_field = ''
     for field in fields:
         if field.kw_only:
             continue
         if had_default and field.default is MISSING:
             raise ValueError(
-                f"Non default field {field.name!r}"
-                " after field with default"
-                f" {last_default_field!r} without kw_only flag"
+                f'Non default field {field.name!r}'
+                ' after field with default'
+                f' {last_default_field!r} without kw_only flag'
             )
         if not had_default and field.default is not MISSING:
             last_default_field = field.name

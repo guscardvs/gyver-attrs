@@ -1,15 +1,16 @@
 import typing
+from collections.abc import Callable
 
 from typing_extensions import ParamSpec
 
-P = ParamSpec("P")
-T = typing.TypeVar("T")
+P = ParamSpec('P')
+T = typing.TypeVar('T')
 
 
 class Factory(typing.Generic[P, T]):
-    __slots__ = ("func",)
+    __slots__ = ('func',)
 
-    def __init__(self, func: typing.Callable[P, T]) -> None:
+    def __init__(self, func: Callable[P, T]) -> None:
         self.func = func
 
     def __call__(self, *args: P.args, **kwds: P.kwargs) -> T:
@@ -20,7 +21,7 @@ class Factory(typing.Generic[P, T]):
         return self.func.__name__
 
 
-def mark_factory(func: typing.Callable[P, T]) -> Factory[P, T]:
+def mark_factory(func: Callable[P, T]) -> Factory[P, T]:
     return Factory(func)
 
 

@@ -9,13 +9,11 @@ template = (
 
 
 class HasStr(Protocol):
-    def __str__(self) -> str:
-        ...
+    def __str__(self) -> str: ...
 
 
 class HasToString(HasStr, Protocol):
-    def to_string(self) -> str:
-        ...
+    def to_string(self) -> str: ...
 
 
 PropsType = Union[dict[str, HasStr], HasStr]
@@ -26,7 +24,7 @@ def str_cast(string: str):
 
 
 class DictSchema:
-    __slots__ = ("type_", "extras")
+    __slots__ = ('type_', 'extras')
 
     def __init__(self, type_: str, **extras: PropsType) -> None:
         self.type_ = type_
@@ -37,38 +35,38 @@ class DictSchema:
 
     def to_string(self) -> str:
         return (
-            "{"
-            + ",".join(
+            '{'
+            + ','.join(
                 item
                 for item in (f'"type": "{self.type_}"', self.build_extras())
                 if item
             )
-            + "}"
+            + '}'
         )
 
     def build_extras(self) -> str:
         if not self.extras:
-            return ""
+            return ''
         lines = [
             f'"{to_camel(name)}":'
             + (
-                " {"
-                + ", ".join(
+                ' {'
+                + ', '.join(
                     f'"{to_camel(key)}": {value!s}' for key, value in props.items()
                 )
-                + "}"
+                + '}'
                 if isinstance(props, dict)
                 else str(props)
             )
             for name, props in self.extras.items()
         ]
-        return ", ".join(lines)
+        return ', '.join(lines)
 
 
 class ListSchema:
     __slots__ = (
-        "type_",
-        "items",
+        'type_',
+        'items',
     )
 
     def __init__(self, type_: str, *items: HasStr) -> None:
@@ -79,12 +77,12 @@ class ListSchema:
         return self.to_string()
 
     def to_string(self):
-        items = ", ".join(str(item) for item in self.items)
+        items = ', '.join(str(item) for item in self.items)
         return f'{{"{self.type_}": [{items}]}}'
 
 
 class Items:
-    __slots__ = ("items",)
+    __slots__ = ('items',)
 
     def __init__(self, *items: HasStr) -> None:
         self.items = items
@@ -93,12 +91,12 @@ class Items:
         return self.to_string()
 
     def to_string(self):
-        items = ", ".join(str(item) for item in self.items)
-        return f"[{items}]"
+        items = ', '.join(str(item) for item in self.items)
+        return f'[{items}]'
 
 
 class RefSchema:
-    __slots__ = ("title",)
+    __slots__ = ('title',)
 
     def __init__(self, title: str) -> None:
         self.title = title
@@ -108,7 +106,7 @@ class RefSchema:
 
 
 class Schema:
-    __slots__ = ("title", "type_", "required", "extras", "nullable")
+    __slots__ = ('title', 'type_', 'required', 'extras', 'nullable')
 
     def __init__(
         self,
@@ -131,8 +129,8 @@ class Schema:
         extras = self.build_extras()
         required = self.build_required()
         return (
-            "{"
-            + ", ".join(
+            '{'
+            + ', '.join(
                 item
                 for item in (
                     f'"title": "{self.title}"',
@@ -143,29 +141,29 @@ class Schema:
                 )
                 if item
             )
-            + "}"
+            + '}'
         )
 
     def build_extras(self) -> str:
         if not self.extras:
-            return ""
+            return ''
         lines = []
         for name, props in self.extras.items():
             props_str = self._make_prop_str(props)
             lines.append(f'"{to_camel(name)}": {props_str}')
-        return ", ".join(lines)
+        return ', '.join(lines)
 
     def _make_prop_str(self, props: PropsType):
         if not isinstance(props, dict):
             return str(props)
-        props_str = ",".join(
+        props_str = ','.join(
             f'"{to_camel(key)}": {value!s}' for key, value in props.items()
         )
-        return f"{{{props_str}}}"
+        return f'{{{props_str}}}'
 
     def build_required(self) -> str:
         return (
             f""""required": [{",".join(f'"{val}"' for val in self.required)}]"""
             if self.required
-            else ""
+            else ''
         )

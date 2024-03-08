@@ -6,9 +6,9 @@ import typing_extensions
 from .field import Field, FieldInfo, info
 from .main import define
 
-T = typing.TypeVar("T")
+T = typing.TypeVar('T')
 
-ReturnT = typing.Union[typing.Callable[[type[T]], type[T]], type[T]]
+ReturnT = typing.Union[Callable[[type[T]], type[T]], type[T]]
 OptionalTypeT = typing.Optional[type[T]]
 
 
@@ -28,8 +28,7 @@ def mutable(
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
     alias_generator: Callable[[str], str] = str,
-) -> typing.Callable[[type[T]], type[T]]:
-    ...
+) -> Callable[[type[T]], type[T]]: ...
 
 
 @typing.overload
@@ -48,8 +47,7 @@ def mutable(
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
     alias_generator: Callable[[str], str] = str,
-) -> type[T]:
-    ...
+) -> type[T]: ...
 
 
 @typing_extensions.dataclass_transform(
@@ -107,8 +105,7 @@ def kw_only(
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
     alias_generator: Callable[[str], str] = str,
-) -> typing.Callable[[type[T]], type[T]]:
-    ...
+) -> Callable[[type[T]], type[T]]: ...
 
 
 @typing.overload
@@ -127,8 +124,7 @@ def kw_only(
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
     alias_generator: Callable[[str], str] = str,
-) -> type[T]:
-    ...
+) -> type[T]: ...
 
 
 @typing_extensions.dataclass_transform(
@@ -186,8 +182,7 @@ def schema_class(
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
     alias_generator: Callable[[str], str] = str,
-) -> typing.Callable[[type[T]], type[T]]:
-    ...
+) -> Callable[[type[T]], type[T]]: ...
 
 
 @typing.overload
@@ -206,8 +201,7 @@ def schema_class(
     dataclass_fields: bool = False,
     field_class: type[Field] = Field,
     alias_generator: Callable[[str], str] = str,
-) -> type[T]:
-    ...
+) -> type[T]: ...
 
 
 @typing_extensions.dataclass_transform(
