@@ -100,7 +100,6 @@ def rebuild_type_from_depth(node: TypeNode) -> type:
         elif all(child in rebuilt_types for child in current_node.args):
             # If all child nodes have been rebuilt, reconstruct the type.
             arg_types = [rebuilt_types[child] for child in current_node.args]
-            print(current_node.type_, arg_types)
             rebuilt_types[current_node] = rebuild_type(
                 current_node.type_, tuple(arg_types)
             )
@@ -176,3 +175,16 @@ def to_camel(string: str) -> str:
 def to_upper_camel(string: str) -> str:
     result = to_camel(string)
     return result[:1].upper() + result[1:]
+
+
+_dunder_regex = re.compile('__[a-zA-Z0-9_]__')
+
+
+def is_dunder(string: str) -> bool:
+    return _dunder_regex.match(string) is not None
+
+
+def sanitize(string: str) -> str:
+    if is_dunder(string):
+        return string
+    return string.lstrip('_')

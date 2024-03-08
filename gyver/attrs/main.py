@@ -12,7 +12,7 @@ from gyver.attrs.converters.utils import deserialize, deserialize_mapping, fromd
 from gyver.attrs.field import Field, FieldInfo, info
 from gyver.attrs.methods import MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
-from gyver.attrs.utils.functions import disassemble_type, indent
+from gyver.attrs.utils.functions import disassemble_type, indent, sanitize
 from gyver.attrs.utils.functions import frozen as freeze
 from gyver.attrs.utils.typedef import MISSING, UNINITIALIZED, Descriptor, InitOptions
 
@@ -270,7 +270,7 @@ def _get_init(cls: type, field_map: FieldMap, opts: InitOptions):
         builder.add_scriptline('_inst_dict = self.__dict__')
     for field in field_map.values():
         field_name = field.name
-        arg_name = field.alias.lstrip('_')
+        arg_name = sanitize(field.alias)
         if not field.init:
             if field.has_default:
                 builder.add_scriptline(
