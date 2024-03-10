@@ -1,6 +1,6 @@
 import linecache
 import sys
-from enum import Enum
+from enum import Enum, auto
 from typing import Any, Mapping, Optional, Union
 
 from typing_extensions import Self
@@ -16,6 +16,11 @@ class MethodType(str, Enum):
     STATIC = 'static'
 
 
+class ArgumentType(Enum):
+    POSITIONAL = auto()
+    KEYWORD = auto()
+
+
 class MethodBuilder:
     def __init__(
         self, method_name: str, globs: Optional[dict[str, Any]] = None
@@ -25,7 +30,7 @@ class MethodBuilder:
         self.script_lines: list[str] = []
         self.annotations: dict[str, Union[type, None]] = {}
         self.funcargs: list[str] = []
-        self.funckargs: list[str] = []
+        self.funckwargs: list[str] = []
         self.meth_type = MethodType.INSTANCE
 
     def add_scriptline(self, line: str) -> Self:
@@ -48,12 +53,11 @@ class MethodBuilder:
         self.annotations[name] = value
         return self
 
-    def add_funcarg(self, name: str) -> Self:
-        self.funcargs.append(name)
-        return self
-
-    def add_funckarg(self, name: str) -> Self:
-        self.funckargs.append(name)
+    def add_arg(self, name: str, type_: ArgumentType) -> Self:
+        if type_ is ArgumentType.POSITIONAL:
+            self.funcargs.append(name)
+        else:
+            self.funckwargs.append(name)
         return self
 
     def set_type(self, meth_type: MethodType) -> Self:
@@ -99,8 +103,8 @@ class MethodBuilder:
         else:
             funcargs.insert(0, 'self')
         args = ', '.join(funcargs)
-        if self.funckargs:
-            args += f'{", " if args else ""}*, {", ".join(self.funckargs)}'
+        if self.funckwargs:
+            args += f'{", " if args else ""}*, {", ".join(self.funckwargs)}'
         method_signature = method_header + args + method_footer
 
         method_body = '\n    '.join(self.script_lines) if self.script_lines else 'pass'

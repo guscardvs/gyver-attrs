@@ -1,7 +1,7 @@
 import dataclasses
 import sys
 import typing
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from datetime import date, datetime, time, timedelta
 from enum import Enum
 
@@ -10,7 +10,7 @@ import typing_extensions
 from gyver.attrs import schema
 from gyver.attrs.converters.utils import deserialize, deserialize_mapping, fromdict
 from gyver.attrs.field import Field, FieldInfo, info
-from gyver.attrs.methods import MethodBuilder, MethodType
+from gyver.attrs.methods import ArgumentType, MethodBuilder, MethodType
 from gyver.attrs.resolver import FieldsBuilder
 from gyver.attrs.utils.functions import disassemble_type, indent, sanitize
 from gyver.attrs.utils.functions import frozen as freeze
@@ -302,10 +302,9 @@ def _get_init(cls: type, field_map: FieldMap, opts: InitOptions):
         else:
             builder.add_scriptline(_setattr(field_name, arg_name))
             arg = arg_name
-        if field.kw_only:
-            builder.add_funckarg(arg)
-        else:
-            builder.add_funcarg(arg)
+        builder.add_arg(
+            arg, ArgumentType.KEYWORD if field.kw_only else ArgumentType.POSITIONAL
+        )
         builder.add_annotation(arg_name, field.declared_type)
     if hasattr(cls, '__post_init__'):
         builder.add_scriptline('self.__post_init__()')
@@ -341,7 +340,7 @@ def _get_eq(cls: type, field_map: FieldMap):
     fields_to_compare = {
         name: field for name, field in field_map.items() if field.eq is not False
     }
-    builder = MethodBuilder('__eq__').add_funcarg(_othername)
+    builder = MethodBuilder('__eq__').add_arg(_othername, ArgumentType.POSITIONAL)
     if fields_to_compare:
         return _build_field_comparison(builder, fields_to_compare, cls)
     returnline = 'return _object_eq(self, other)'
@@ -400,7 +399,7 @@ def _get_parse_dict(cls: type, field_map: FieldMap):
                 'deserialize_mapping': deserialize_mapping,
             },
         )
-        .add_funcarg('alias')
+        .add_arg('alias', ArgumentType.POSITIONAL)
         .add_annotation('alias', bool)
         .add_annotation('return', Mapping[str, typing.Any])
     )
@@ -524,7 +523,7 @@ def _get_gserialize(cls: type, field_map: FieldMap):
                 '_dict_get': dict.get,
             },
         )
-        .add_funcarg('mapping')
+        .add_arg('mapping', ArgumentType.POSITIONAL)
         .add_annotation('return', cls)
         .add_annotation('mapping', Mapping[str, typing.Any])
         .set_type(MethodType.CLASS)
@@ -601,7 +600,7 @@ def _get_gserialize_sequence_arg(
 def _get_ne(cls: type):
     return (
         MethodBuilder('__ne__')
-        .add_funcarg(_othername)
+        .add_arg(_othername, ArgumentType.POSITIONAL)
         .add_annotation('return', bool)
         .add_scriptlines(
             'result = self.__eq__(other)',
@@ -644,7 +643,7 @@ def _make_comparator_builder(name: str, signal: str, field_map: FieldMap):
     if not fields:
         return (
             MethodBuilder(name, {f'_object_{name}': getattr(object, name)})
-            .add_funcarg(_othername)
+            .add_arg(_othername, ArgumentType.POSITIONAL)
             .add_annotation('return', bool)
             .add_scriptline(f'return _object_{name}(self, other)')
         )
@@ -654,7 +653,7 @@ def _make_comparator_builder(name: str, signal: str, field_map: FieldMap):
     )
     attr_tuple = _get_order_attr_tuple(fields)
     return (
-        builder.add_funcarg(_othername)
+        builder.add_arg(_othername, ArgumentType.POSITIONAL)
         .add_annotation('return', bool)
         .add_scriptlines(
             'if type(other) is type(self):',
@@ -716,9 +715,9 @@ def _get_pydantic_handlers(cls: type, fields_map: FieldMap):
     builder = MethodBuilder('__pydantic_validate__', {'fromdict': fromdict}).set_type(
         MethodType.CLASS
     )
-    builder.add_funcarg('value').add_annotation('value', typing.Any).add_annotation(
-        'return', cls
-    )
+    builder.add_arg('value', ArgumentType.POSITIONAL).add_annotation(
+        'value', typing.Any
+    ).add_annotation('return', cls)
     builder.add_scriptlines(
         'if isinstance(value, cls):',
         indent('return value'),
@@ -737,14 +736,14 @@ def _get_pydantic_handlers(cls: type, fields_map: FieldMap):
 
     builder.add_scriptline('yield cls.__pydantic_validate__ ')
     namespace |= builder.add_annotation(
-        'return', typing.Generator[typing.Any, typing.Any, Callable]
+        'return', Generator[typing.Any, typing.Any, Callable]
     ).build(cls)
 
     # Make modify schema
     builder = (
         MethodBuilder('__modify_schema__')
         .set_type(MethodType.CLASS)
-        .add_funcarg('field_schema')
+        .add_arg('field_schema', ArgumentType.POSITIONAL)
     )
 
     cls_schema = schema.Schema(

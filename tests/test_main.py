@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from gyver.attrs import UNINITIALIZED, define, info, mark_factory
-from gyver.attrs.helpers import call_init, init_hooks
+from gyver.attrs.helpers import call_init, gattrs_method, init_hooks
 from gyver.attrs.methods import MethodBuilder
 
 
@@ -356,7 +356,7 @@ def test_define_does_not_overwrite_methods_but_creates_gattrs_alternatives():
         b: int
 
         def __init__(self, a: int, b: int):
-            self.__gattrs_init__(a, b)
+            gattrs_method('init', self, a, b)
 
         def __repr__(self):
             return f'B(a={self.a}, b={self.b})'

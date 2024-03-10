@@ -1,10 +1,10 @@
 import inspect
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from functools import wraps
 from types import ModuleType
-from typing import Any, ForwardRef, Optional, TypeVar, Union, cast
+from typing import Any, ForwardRef, Literal, Optional, TypeVar, Union, cast, overload
 
 from typing_extensions import Concatenate, ParamSpec
 
@@ -39,11 +39,53 @@ def fields(cls: type) -> dict[str, Field]:
 @validate_type
 def call_init(self: Any, *args, **kwargs) -> None:
     """Calls __gattrs_init__ without having redlines in the code"""
-    init = cast(
-        Callable[..., None],
-        getattr(self, '__gattrs_init__', self.__init__),
-    )
-    return init(*args, **kwargs)
+    return gattrs_method('init', self, *args, **kwargs)
+
+
+@overload
+def gattrs_method(method_name: Literal['repr'], instance: Any) -> str: ...
+@overload
+def gattrs_method(
+    method_name: Literal['eq', 'ne', 'lt', 'le', 'gt', 'ge'], instance: Any, other: Any
+) -> bool: ...
+@overload
+def gattrs_method(
+    method_name: Literal['parse_dict'], instance: Any, alias: bool
+) -> Mapping[str, Any]: ...
+@overload
+def gattrs_method(
+    method_name: Literal['gserialize'], instance: type[T], mapping: Mapping[str, Any]
+) -> T: ...
+@overload
+def gattrs_method(method_name: Literal['hash'], instance: Any) -> int: ...
+@overload
+def gattrs_method(
+    method_name: Literal['pydantic_validate'], instance: type[T], value: Any
+) -> T: ...
+@overload
+def gattrs_method(
+    method_name: Literal['get_validators'], instance: type
+) -> Generator[Any, Any, Callable]: ...
+@overload
+def gattrs_method(
+    method_name: Literal['modify_schema'], instance: type, field_schema
+) -> None: ...
+@overload
+def gattrs_method(
+    method_name: Literal['init'],
+    instance: Any,
+    *args,
+    **kwargs,
+) -> None: ...
+
+
+def gattrs_method(method_name: str, instance: Any, *args, **kwargs) -> Any:
+    _do_nothing(instance)
+    method_name = method_name.strip('_')
+    return (
+        getattr(instance, f'__gattrs_{method_name}__', None)
+        or getattr(instance, f'__{method_name}__')
+    )(*args, **kwargs)
 
 
 CallbackSequence = Sequence[Callable[[T], Any]]
